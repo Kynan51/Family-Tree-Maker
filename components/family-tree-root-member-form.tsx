@@ -1,0 +1,110 @@
+"use client"
+import { useState, useTransition } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: string, userId: string }) {
+  const [form, setForm] = useState({
+    fullName: '',
+    yearOfBirth: '',
+    livingPlace: '',
+    maritalStatus: 'Single',
+    occupation: '',
+    isDeceased: 'false',
+    addAsAdmin: 'no',
+  })
+  const [loading, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(false)
+    startTransition(async () => {
+      const supabase = createClient()
+      // Insert member
+      const { data: member, error: memberError } = await supabase.from("family_members").insert({
+        full_name: form.fullName,
+        year_of_birth: parseInt(form.yearOfBirth),
+        living_place: form.livingPlace,
+        is_deceased: form.isDeceased === 'true',
+        marital_status: form.maritalStatus,
+        occupation: form.occupation,
+        family_id: familyId,
+      }).select().single()
+      if (memberError) {
+        setError(memberError.message)
+        return
+      }
+      // Optionally add as admin
+      if (form.isDeceased === 'false' && form.addAsAdmin === 'yes') {
+        await supabase.from("user_family_access").insert({
+          user_id: userId,
+          family_id: familyId,
+          access_level: "admin",
+          status: "approved",
+        })
+      }
+      setSuccess(true)
+      window.location.reload()
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Full Name</label>
+        <input name="fullName" required className="w-full border rounded px-3 py-2" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} />
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Year of Birth</label>
+        <input name="yearOfBirth" type="number" required className="w-full border rounded px-3 py-2" value={form.yearOfBirth} onChange={e => setForm(f => ({ ...f, yearOfBirth: e.target.value }))} />
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Living Place</label>
+        <input name="livingPlace" required className="w-full border rounded px-3 py-2" value={form.livingPlace} onChange={e => setForm(f => ({ ...f, livingPlace: e.target.value }))} />
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Marital Status</label>
+        <select name="maritalStatus" required className="w-full border rounded px-3 py-2" value={form.maritalStatus} onChange={e => setForm(f => ({ ...f, maritalStatus: e.target.value }))}>
+          <option value="Single">Single</option>
+          <option value="Married">Married</option>
+          <option value="Divorced">Divorced</option>
+          <option value="Widowed">Widowed</option>
+        </select>
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Occupation</label>
+        <input name="occupation" className="w-full border rounded px-3 py-2" value={form.occupation} onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} />
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Deceased?</label>
+        <select name="isDeceased" required className="w-full border rounded px-3 py-2" value={form.isDeceased} onChange={e => setForm(f => ({ ...f, isDeceased: e.target.value }))}>
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+      <div className="mb-3">
+        <label className="block mb-1 font-medium">Add as Admin?</label>
+        <div className="flex gap-4">
+          <label>
+            <input type="radio" name="addAsAdmin" value="yes" checked={form.addAsAdmin === 'yes'}
+              onChange={e => setForm(f => ({ ...f, addAsAdmin: 'yes' }))}
+              disabled={form.isDeceased === 'true'}
+            /> Yes
+          </label>
+          <label>
+            <input type="radio" name="addAsAdmin" value="no" checked={form.addAsAdmin === 'no'}
+              onChange={e => setForm(f => ({ ...f, addAsAdmin: 'no' }))}
+            /> No
+          </label>
+        </div>
+      </div>
+      {error && <div className="text-red-600 mb-2">{error}</div>}
+      {success && <div className="text-green-600 mb-2">Member added!</div>}
+      <button type="submit" className="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold" disabled={loading}>
+        {loading ? "Adding..." : "Add First Member"}
+      </button>
+    </form>
+  )
+} 
