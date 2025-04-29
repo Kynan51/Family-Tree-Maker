@@ -27,6 +27,17 @@ CREATE INDEX IF NOT EXISTS idx_user_family_access_status ON user_family_access(s
 -- Add family_id column to family_members table if not exists
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS family_id UUID REFERENCES families(id) ON DELETE CASCADE;
 
+-- Add occupation and living_place columns to family_members if not exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='family_members' AND column_name='occupation') THEN
+        ALTER TABLE family_members ADD COLUMN occupation TEXT DEFAULT 'N/A';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='family_members' AND column_name='living_place') THEN
+        ALTER TABLE family_members ADD COLUMN living_place TEXT DEFAULT 'N/A';
+    END IF;
+END $$;
+
 -- Notifications Table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

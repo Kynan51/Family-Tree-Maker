@@ -50,6 +50,9 @@ export default async function TreePage() {
     ? accessibleFamilies.map(row => row.family_id).filter(Boolean)
     : [];
 
+  console.log("accessibleFamilies:", accessibleFamilies);
+  console.log("familyIds:", familyIds);
+
   if (!familyIds || familyIds.length === 0) {
     return (
       <div className="container mx-auto py-12 flex flex-col items-center">
@@ -98,6 +101,31 @@ export default async function TreePage() {
             <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">Search for an existing family tree and request access to join your relatives.</p>
             <a href="/request-access" className="inline-block px-6 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition">Search & Request Access</a>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If user has families but no members, show a message and list families as links
+  if (safeMembers.length === 0) {
+    return (
+      <div className="container mx-auto py-12 flex flex-col items-center">
+        <h1 className="text-3xl font-bold mb-10">No Family Members Yet</h1>
+        <p className="mb-6 text-center text-gray-600 dark:text-gray-300">
+          You have a family, but no members have been added yet.<br />
+          Go to your family page to add the first member.
+        </p>
+        <div className="flex flex-wrap gap-6 justify-center">
+          {familyIds.map(familyId => (
+            <a
+              key={familyId}
+              href={`/tree/${familyId}`}
+              className="block px-6 py-4 bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-700 text-center hover:bg-green-50 dark:hover:bg-green-900 transition"
+            >
+              <span className="font-semibold">Go to Family</span><br />
+              <span className="text-xs text-gray-500">ID: {familyId}</span>
+            </a>
+          ))}
         </div>
       </div>
     )

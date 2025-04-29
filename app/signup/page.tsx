@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { createClientSide } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 function isValidEmail(email: string) {
@@ -61,10 +61,9 @@ export default function SignUpPage() {
       return
     }
     setLoading(true)
-    const supabase = createClientSide()
     let result
     if (tab === "email") {
-      result = await supabase.auth.signUp({
+      result = await createClient().auth.signUp({
         email: trimmedEmail,
         password,
         options: {
@@ -77,7 +76,7 @@ export default function SignUpPage() {
         },
       })
     } else {
-      result = await supabase.auth.signUp({
+      result = await createClient().auth.signUp({
         phone: trimmedPhone,
         password,
         options: {

@@ -26,10 +26,10 @@ export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: strin
       const { data: member, error: memberError } = await supabase.from("family_members").insert({
         full_name: form.fullName,
         year_of_birth: parseInt(form.yearOfBirth),
-        living_place: form.livingPlace,
+        living_place: form.livingPlace.trim() ? form.livingPlace : "N/A",
         is_deceased: form.isDeceased === 'true',
         marital_status: form.maritalStatus,
-        occupation: form.occupation,
+        occupation: form.occupation.trim() ? form.occupation : "N/A",
         family_id: familyId,
       }).select().single()
       if (memberError) {

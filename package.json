@@ -10,8 +10,6 @@
     "seed": "npx tsx scripts/seed.ts"
   },
   "dependencies": {
-    "@auth/core": "^0.34.2",
-    "@auth/supabase-adapter": "^0.1.0",
     "@emotion/react": "latest",
     "@emotion/styled": "latest",
     "@hookform/resolvers": "latest",
@@ -58,7 +56,6 @@
     "input-otp": "1.4.1",
     "lucide-react": "^0.503.0",
     "next": "15.2.4",
-    "next-auth": "^4.24.5",
     "next-themes": "latest",
     "nodemailer": "latest",
     "react": "^18.2.0",

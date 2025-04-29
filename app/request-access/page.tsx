@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Search } from "lucide-react"
-import { createClientSide } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { requestFamilyAccess } from "@/lib/actions"
 
@@ -31,7 +31,7 @@ export default function RequestAccessPage() {
       }
 
       try {
-        const supabase = createClientSide()
+        const supabase = createClient()
         const { data, error } = await supabase
           .from("families")
           .select("id, name, description")

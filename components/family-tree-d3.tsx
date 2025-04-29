@@ -219,6 +219,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd }: any) {
 }
 
 export function FamilyTreeD3({ data }: FamilyTreeD3Props) {
+  console.log("FamilyTreeD3 data:", data);
   // Add state for add-member modal
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addTargetNode, setAddTargetNode] = useState<any>(null)

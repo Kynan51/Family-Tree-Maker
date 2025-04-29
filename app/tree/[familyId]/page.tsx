@@ -59,7 +59,20 @@ export default async function FamilyTreePage({ params }: FamilyTreePageProps) {
   }
 
   // If members is null or undefined, treat as empty array
-  const safeMembers = members ?? []
+  const safeMembers = (members ?? []).map((m: any) => ({
+    id: m.id,
+    fullName: m.full_name,
+    yearOfBirth: m.year_of_birth,
+    livingPlace: m.living_place,
+    isDeceased: m.is_deceased,
+    maritalStatus: m.marital_status,
+    photoUrl: m.photo_url,
+    relationships: m.relationships,
+    createdAt: m.created_at,
+    updatedAt: m.updated_at,
+    familyId: m.family_id,
+    occupation: m.occupation,
+  }))
 
   // If there are no members, show a root-member form
   if (safeMembers.length === 0) {

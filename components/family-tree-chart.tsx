@@ -5,11 +5,13 @@ import { useState } from "react"
 
 interface FamilyMember {
   id: string
-  name: string
+  fullName: string
   yearOfBirth: number
   livingPlace: string
   generation: number
   isDeceased: boolean
+  occupation?: string
+  maritalStatus?: string
   children?: FamilyMember[]
 }
 
@@ -30,15 +32,18 @@ function MemberCard({ member }: { member: FamilyMember }) {
           <div className="rounded-full bg-gray-200 w-12 h-12 flex items-center justify-center mb-2">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
           </div>
-          <span className="font-medium text-center text-sm">{member.name}</span>
+          <span className="font-medium text-center text-sm">{member.fullName}</span>
         </CardContent>
       </Card>
       {/* Tooltip for details */}
       {hovered && (
-        <div className="absolute z-10 -bottom-24 left-1/2 -translate-x-1/2 w-48 bg-white border border-gray-300 rounded shadow-lg p-2 text-xs animate-fade-in">
+        <div className="absolute z-10 -bottom-32 left-1/2 -translate-x-1/2 w-56 bg-white border border-gray-300 rounded shadow-lg p-2 text-xs animate-fade-in">
+          <div><span className="font-semibold">Relation:</span> N/A</div>
+          <div><span className="font-semibold">Status:</span> <span className={member.isDeceased ? 'text-red-500' : 'text-green-600'}>{member.isDeceased ? 'Deceased' : 'Alive'}</span></div>
           <div><span className="font-semibold">Year of Birth:</span> {member.yearOfBirth}</div>
           <div><span className="font-semibold">Living Place:</span> {member.livingPlace}</div>
-          {member.isDeceased && <div className="text-red-500 font-semibold">Deceased</div>}
+          <div><span className="font-semibold">Occupation:</span> {member.occupation ?? 'N/A'}</div>
+          <div><span className="font-semibold">Marital Status:</span> {member.maritalStatus ?? 'N/A'}</div>
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { createClientSide } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Session, User } from "@supabase/supabase-js"
 
 interface SupabaseAuthContextType {
@@ -9,6 +9,7 @@ interface SupabaseAuthContextType {
   user: User | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
+  signOut: () => Promise<void>
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
@@ -18,6 +19,9 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
   signIn: async () => {
     throw new Error("Auth provider not initialized")
   },
+  signOut: async () => {
+    throw new Error("Auth provider not initialized")
+  },
 })
 
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
@@ -25,8 +29,11 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Debug log on every render
+  console.log("[SupabaseAuthProvider] Rendered. Session:", session);
+
   const signIn = async (email: string, password: string) => {
-    const supabase = createClientSide()
+    const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -34,8 +41,23 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     if (error) throw error
   }
 
+  const signOut = async () => {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+    
+    // Clear local storage
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('sb-pqcdstmuqohhaqoungvu-auth-token')
+    }
+    
+    // Clear session state
+    setSession(null)
+    setUser(null)
+  }
+
   useEffect(() => {
-    const supabase = createClientSide()
+    const supabase = createClient()
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -71,10 +93,16 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <SupabaseAuthContext.Provider value={{ session, user, loading, signIn }}>
+    <SupabaseAuthContext.Provider value={{ session, user, loading, signIn, signOut }}>
       {children}
     </SupabaseAuthContext.Provider>
   )
 }
 
-export const useSupabaseAuth = () => useContext(SupabaseAuthContext) 
+export const useSupabaseAuth = () => {
+  const context = useContext(SupabaseAuthContext)
+  if (context === undefined) {
+    throw new Error("useSupabaseAuth must be used within a SupabaseAuthProvider")
+  }
+  return context
+} 

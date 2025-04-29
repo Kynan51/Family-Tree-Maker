@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { AdminDashboard } from "@/components/admin-dashboard"
 import { UserDashboard } from "@/components/user-dashboard"
-import { createClientSide } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { LoadingScreen } from "@/components/ui/loading-screen"
 
 export function DashboardClient() {
   const router = useRouter()
@@ -27,7 +28,7 @@ export function DashboardClient() {
     if (!session) return
     setDataLoading(true)
     setDataError(null)
-    const supabase = createClientSide()
+    const supabase = createClient()
     const fetchData = async () => {
       try {
         if (session.user.role === "admin" || session.user.role === "super_admin") {
@@ -60,25 +61,17 @@ export function DashboardClient() {
     fetchData()
   }, [session])
 
-  if (loading || dataLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    )
+  if (loading) {
+    return <LoadingScreen />
   }
 
-  if (error || dataError) {
+  if (error) {
     return (
-      <div className="container mx-auto py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            {error?.message || dataError}
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{error.message}</AlertDescription>
+      </Alert>
     )
   }
 

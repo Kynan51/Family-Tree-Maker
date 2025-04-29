@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClientSide } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 
 export default function CreateFamilyPage() {
@@ -30,7 +30,7 @@ export default function CreateFamilyPage() {
     }
 
     try {
-      const supabase = createClientSide()
+      const supabase = createClient()
 
       // Create the family
       const { data: family, error: familyError } = await supabase

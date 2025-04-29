@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useSupabaseAuth } from "@/components/supabase-auth-provider"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -21,6 +21,7 @@ import { formatDistanceToNow } from "date-fns"
 
 export function Header() {
   const { session, signOut } = useSupabaseAuth();
+  const router = useRouter();
   // Debug log for session and status
   console.log("Header session:", session);
   const pathname = usePathname()
@@ -29,6 +30,15 @@ export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState(session?.notifications || []);
   const [unreadNotifications, setUnreadNotifications] = useState(notifications.filter(n => !n.read).length);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/auth/signin");
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
 
   const handleMarkNotificationAsRead = async (notificationId) => {
     try {
@@ -63,7 +73,7 @@ export function Header() {
   ]
 
   return (
-    <header className="border-b bg-background pb-[5px]">
+    <header className="sticky top-0 z-50 w-full border-b bg-background">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
@@ -182,7 +192,7 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut && signOut()}>
+                  <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
@@ -218,7 +228,7 @@ export function Header() {
             <Button
               variant="ghost"
               className="justify-start"
-              onClick={() => { signOut && signOut(); setDrawerOpen(false) }}
+              onClick={() => { handleLogout(); setDrawerOpen(false) }}
             >
               <LogOut className="mr-2 h-4 w-4" /> Log out
             </Button>

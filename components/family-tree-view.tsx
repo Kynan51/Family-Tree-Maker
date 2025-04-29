@@ -17,6 +17,7 @@ interface FamilyTreeViewProps {
 }
 
 export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeViewProps) {
+  console.log("familyMembers prop:", familyMembers);
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -76,7 +77,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
           }}
         >
           {view === "tree" ? (
-            <FamilyTreeD3 data={familyMembers} />
+            <FamilyTreeD3 data={familyMembers.map(m => ({ ...m, name: m.fullName }))} />
           ) : (
             <TimelineChart familyMembers={familyMembers} />
           )}
