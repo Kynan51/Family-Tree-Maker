@@ -1,7 +1,6 @@
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ClientLayout } from "@/components/client-layout"
-import { ThemeScript } from "@/components/theme-script"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,7 +18,22 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <ThemeScript />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme');
+                  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>

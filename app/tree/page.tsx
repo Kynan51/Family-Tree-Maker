@@ -19,7 +19,32 @@ export default async function TreePage() {
   const { data: settings } = await supabase.from("app_settings").select("privacy_enabled").single()
   const privacyEnabled = settings?.privacy_enabled ?? true
 
-  const isAdmin = session.user.role === "admin" || session.user.role === "super_admin"
+  // Get user's accessible families
+  const { data: accessibleFamilies } = await supabase
+    .from("user_family_access")
+    .select("family_id")
+    .eq("user_id", session.user.id)
+    .eq("status", "approved")
+
+  const familyIds = Array.isArray(accessibleFamilies)
+    ? accessibleFamilies.map(row => row.family_id).filter(Boolean)
+    : [];
+
+  // Assume you have a way to get the current familyId (e.g., from params or context)
+  // For this example, let's say you have a variable currentFamilyId
+  // You may need to adjust this to match your actual code
+  const currentFamilyId = familyIds[0]; // Replace with actual logic to get the current familyId
+
+  // Check if user is admin for the current family
+  const { data: adminAccess } = await supabase
+    .from("user_family_access")
+    .select("access_level")
+    .eq("user_id", session.user.id)
+    .eq("family_id", currentFamilyId)
+    .eq("status", "approved")
+    .eq("access_level", "admin")
+
+  const isAdmin = (adminAccess && adminAccess.length > 0) || session.user.role === "super_admin"
 
   // If privacy is disabled, use admin client to get all data
   if (!privacyEnabled) {
@@ -40,19 +65,6 @@ export default async function TreePage() {
   }
 
   // Otherwise, get user's accessible families and public families
-  const { data: accessibleFamilies } = await supabase
-    .from("user_family_access")
-    .select("family_id")
-    .eq("user_id", session.user.id)
-    .eq("status", "approved")
-
-  const familyIds = Array.isArray(accessibleFamilies)
-    ? accessibleFamilies.map(row => row.family_id).filter(Boolean)
-    : [];
-
-  console.log("accessibleFamilies:", accessibleFamilies);
-  console.log("familyIds:", familyIds);
-
   if (!familyIds || familyIds.length === 0) {
     return (
       <div className="container mx-auto py-12 flex flex-col items-center">
@@ -78,7 +90,13 @@ export default async function TreePage() {
   // Only run the query if familyIds is not empty
   const { data: members, error } = await supabase
     .from("family_members")
-    .select("*, relationships:relationships!member_id(*)")
+    .select(`
+      *,
+      relationships!relationships_member_id_fkey (
+        type,
+        related_member_id
+      )
+    `)
     .in('family_id', familyIds)
 
   const safeMembers = members ?? []
@@ -106,35 +124,26 @@ export default async function TreePage() {
     )
   }
 
-  // If user has families but no members, show a message and list families as links
-  if (safeMembers.length === 0) {
-    return (
-      <div className="container mx-auto py-12 flex flex-col items-center">
-        <h1 className="text-3xl font-bold mb-10">No Family Members Yet</h1>
-        <p className="mb-6 text-center text-gray-600 dark:text-gray-300">
-          You have a family, but no members have been added yet.<br />
-          Go to your family page to add the first member.
-        </p>
-        <div className="flex flex-wrap gap-6 justify-center">
-          {familyIds.map(familyId => (
-            <a
-              key={familyId}
-              href={`/tree/${familyId}`}
-              className="block px-6 py-4 bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-700 text-center hover:bg-green-50 dark:hover:bg-green-900 transition"
-            >
-              <span className="font-semibold">Go to Family</span><br />
-              <span className="text-xs text-gray-500">ID: {familyId}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  // Transform the data into the format expected by the tree view
+  const transformedMembers = safeMembers.map(member => ({
+    id: member.id,
+    name: member.full_name,
+    yearOfBirth: member.year_of_birth,
+    livingPlace: member.living_place,
+    isDeceased: member.is_deceased,
+    maritalStatus: member.marital_status,
+    photoUrl: member.photo_url,
+    relationships: member.relationships || [],
+    createdAt: member.created_at,
+    updatedAt: member.updated_at,
+    familyId: member.family_id,
+    occupation: member.occupation || 'N/A'
+  }))
 
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Family Tree</h1>
-      <FamilyTreeView familyMembers={safeMembers} isAdmin={isAdmin} />
+      <FamilyTreeView familyMembers={transformedMembers} isAdmin={isAdmin} />
     </div>
   )
 }

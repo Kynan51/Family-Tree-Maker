@@ -1,57 +1,41 @@
-import type { NextAuthOptions } from "next-auth"
+import { createClient } from "@/lib/supabase/server"
+import type { User } from "@supabase/supabase-js"
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    {
-      id: "credentials",
-      name: "Credentials",
-      type: "credentials",
-      credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        // Simple credential check for testing
-        if (credentials?.email === "test@example.com" && credentials?.password === "password") {
-          return {
-            id: "1",
-            name: "Test User",
-            email: "test@example.com",
-            role: "admin",
-            photoUrl: "/placeholder.svg?height=32&width=32",
-          }
-        }
-        return null
-      },
-    },
-  ],
-  pages: {
-    signIn: "/auth/signin",
-  },
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.role = user.role
-        token.email = user.email
-        token.photoUrl = user.photoUrl || "/placeholder.svg?height=32&width=32"
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.email = token.email as string
-        session.user.photoUrl = (token.photoUrl as string) || "/placeholder.svg?height=32&width=32"
-      }
-      return session
-    },
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  debug: process.env.NODE_ENV === "development",
-  secret: process.env.NEXTAUTH_SECRET,
+export interface ExtendedUser extends User {
+  role?: string;
+  photoUrl?: string;
+}
+
+export async function getSession() {
+  const supabase = createClient()
+  const { data: { session }, error } = await supabase.auth.getSession()
+  
+  if (error) {
+    console.error("Error getting session:", error)
+    return null
+  }
+
+  return session
+}
+
+export async function getUser() {
+  const supabase = createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  
+  if (error) {
+    console.error("Error getting user:", error)
+    return null
+  }
+
+  return user as ExtendedUser
+}
+
+export async function signOut() {
+  const supabase = createClient()
+  const { error } = await supabase.auth.signOut()
+  
+  if (error) {
+    console.error("Error signing out:", error)
+    throw error
+  }
 }

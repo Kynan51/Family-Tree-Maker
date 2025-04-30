@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss"
 
 const config = {
-  darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -28,10 +27,6 @@ const config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          // Light mode green
-          light: "#228B22",
-          // Dark mode green
-          dark: "#013220",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -48,8 +43,6 @@ const config = {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
-          // Gold accent
-          gold: "#B8860B",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -65,23 +58,9 @@ const config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [],
 } satisfies Config
 
 export default config

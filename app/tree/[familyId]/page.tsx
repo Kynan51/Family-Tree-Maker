@@ -61,18 +61,28 @@ export default async function FamilyTreePage({ params }: FamilyTreePageProps) {
   // If members is null or undefined, treat as empty array
   const safeMembers = (members ?? []).map((m: any) => ({
     id: m.id,
+    name: m.name ?? m.full_name ?? "",
     fullName: m.full_name,
     yearOfBirth: m.year_of_birth,
     livingPlace: m.living_place,
     isDeceased: m.is_deceased,
     maritalStatus: m.marital_status,
     photoUrl: m.photo_url,
-    relationships: m.relationships,
+    relationships: (m.relationships ?? []).map((r: any) => ({
+      type: r.type,
+      relatedMemberId: r.related_member_id
+    })),
     createdAt: m.created_at,
     updatedAt: m.updated_at,
     familyId: m.family_id,
     occupation: m.occupation,
   }))
+
+  // Debug log to inspect safeMembers and their relationships
+  console.log("safeMembers for FamilyTreeView:", safeMembers);
+  safeMembers.forEach(m => {
+    console.log(`Member: ${m.name}, id: ${m.id}, relationships:`, m.relationships);
+  });
 
   // If there are no members, show a root-member form
   if (safeMembers.length === 0) {
@@ -146,7 +156,10 @@ export default async function FamilyTreePage({ params }: FamilyTreePageProps) {
           <button type="submit" className="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold">Add Member</button>
         </form>
       </div>
-      <FamilyTreeView familyMembers={safeMembers} isAdmin={isAdmin} familyId={params.familyId} />
+      <FamilyTreeView familyMembers={safeMembers.map(member => ({
+        ...member,
+        name: member.name ?? member.fullName ?? ""
+      }))} isAdmin={isAdmin} familyId={params.familyId} />
     </div>
   )
 }

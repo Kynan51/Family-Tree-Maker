@@ -10,7 +10,6 @@ export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: strin
     maritalStatus: 'Single',
     occupation: '',
     isDeceased: 'false',
-    addAsAdmin: 'no',
   })
   const [loading, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -36,8 +35,8 @@ export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: strin
         setError(memberError.message)
         return
       }
-      // Optionally add as admin
-      if (form.isDeceased === 'false' && form.addAsAdmin === 'yes') {
+      // Automatically add as admin if not deceased
+      if (form.isDeceased === 'false') {
         await supabase.from("user_family_access").insert({
           user_id: userId,
           family_id: familyId,
@@ -83,22 +82,6 @@ export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: strin
           <option value="false">No</option>
           <option value="true">Yes</option>
         </select>
-      </div>
-      <div className="mb-3">
-        <label className="block mb-1 font-medium">Add as Admin?</label>
-        <div className="flex gap-4">
-          <label>
-            <input type="radio" name="addAsAdmin" value="yes" checked={form.addAsAdmin === 'yes'}
-              onChange={e => setForm(f => ({ ...f, addAsAdmin: 'yes' }))}
-              disabled={form.isDeceased === 'true'}
-            /> Yes
-          </label>
-          <label>
-            <input type="radio" name="addAsAdmin" value="no" checked={form.addAsAdmin === 'no'}
-              onChange={e => setForm(f => ({ ...f, addAsAdmin: 'no' }))}
-            /> No
-          </label>
-        </div>
       </div>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       {success && <div className="text-green-600 mb-2">Member added!</div>}

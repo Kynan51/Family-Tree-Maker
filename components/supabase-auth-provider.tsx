@@ -10,6 +10,7 @@ interface SupabaseAuthContextType {
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  signUp: (email: string, password: string, metadata?: Record<string, any>) => Promise<void>
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
@@ -20,6 +21,9 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
     throw new Error("Auth provider not initialized")
   },
   signOut: async () => {
+    throw new Error("Auth provider not initialized")
+  },
+  signUp: async () => {
     throw new Error("Auth provider not initialized")
   },
 })
@@ -41,17 +45,23 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     if (error) throw error
   }
 
+  const signUp = async (email: string, password: string, metadata?: Record<string, any>) => {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata
+      }
+    })
+    if (error) throw error
+  }
+
   const signOut = async () => {
     const supabase = createClient()
     const { error } = await supabase.auth.signOut()
     if (error) throw error
-    
-    // Clear local storage
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('sb-pqcdstmuqohhaqoungvu-auth-token')
-    }
-    
-    // Clear session state
+    // Remove manual localStorage and cookie clearing
     setSession(null)
     setUser(null)
   }
@@ -61,7 +71,6 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Initial session:", session)
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -69,22 +78,9 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("Auth state changed, new session:", session)
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
-
-      // --- NEW: Set the session cookie for SSR sync ---
-      if (typeof document !== "undefined") {
-        if (session?.access_token) {
-          // Set the cookie with the correct name, path, and SameSite policy
-          document.cookie = `sb-pqcdstmuqohhaqoungvu-auth-token=${session.access_token}; path=/; SameSite=Lax`;
-        } else {
-          // Remove the cookie if logged out
-          document.cookie = `sb-pqcdstmuqohhaqoungvu-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-        }
-      }
-      // --- END NEW ---
     })
 
     return () => {
@@ -93,7 +89,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <SupabaseAuthContext.Provider value={{ session, user, loading, signIn, signOut }}>
+    <SupabaseAuthContext.Provider value={{ session, user, loading, signIn, signOut, signUp }}>
       {children}
     </SupabaseAuthContext.Provider>
   )

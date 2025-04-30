@@ -23,7 +23,7 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState(error || "")
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     setErrorMessage("")
@@ -33,7 +33,7 @@ export default function SignIn() {
         router.replace(callbackUrl)
     } catch (error) {
       console.error("Sign in error:", error)
-      setErrorMessage(error.message || "Failed to sign in")
+      setErrorMessage(error instanceof Error ? error.message : "Failed to sign in")
       setIsLoading(false)
     }
   }

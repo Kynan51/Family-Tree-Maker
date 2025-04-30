@@ -23,12 +23,15 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [memberToEdit, setMemberToEdit] = useState<FamilyMember | null>(null)
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null)
-
   const filteredMembers = familyMembers.filter((member) =>
-    member.fullName.toLowerCase().includes(searchQuery.toLowerCase()),
+    member.fullName?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const handleAddMember = (newMember: FamilyMember) => {
+    if (!newMember.fullName) {
+      console.error("Attempted to add member without fullName:", newMember);
+      return;
+    }
     setFamilyMembers((prev) => [...prev, newMember])
   }
 
@@ -51,6 +54,10 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
           <CardContent>
             <div className="text-2xl font-bold">{familyMembers.length}</div>
             <p className="text-xs text-muted-foreground">Manage your family tree members</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Member
+            </Button>
           </CardContent>
         </Card>
 
@@ -83,10 +90,6 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Family Members</CardTitle>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Member
-          </Button>
         </CardHeader>
         <CardContent>
           <div className="flex items-center mb-4">
@@ -152,13 +155,13 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
           </div>
         </CardContent>
       </Card>
-
       {showAddDialog && (
         <AddFamilyMemberDialog
           open={showAddDialog}
           onOpenChange={setShowAddDialog}
           existingMembers={familyMembers}
           onAdd={handleAddMember}
+          familyId={familyMembers[0]?.familyId || ""}
         />
       )}
 

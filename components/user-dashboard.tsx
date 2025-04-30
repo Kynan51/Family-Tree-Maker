@@ -8,6 +8,7 @@ import { Users, UserPlus, CheckCircle, Clock, ShieldCheck, User2 } from "lucide-
 import type { Family, FamilyAccess } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface UserDashboardProps {
   userId: string
@@ -162,8 +163,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           <CardContent>
             <div className="text-2xl font-bold">{stats[0].value}</div>
             <div className="flex gap-2 mt-2">
-              <span className="px-2 py-0.5 rounded-full text-xs bg-green-900/20 text-green-400 dark:bg-green-900/40">{stats[0].approved} Approved</span>
-              <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-900/20 text-yellow-400 dark:bg-yellow-900/40">{stats[0].pending} Pending</span>
+              <Badge variant="success">{stats[0].approved} Approved</Badge>
+              <Badge variant="warning">{stats[0].pending} Pending</Badge>
             </div>
           </CardContent>
         </Card>
@@ -189,7 +190,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats[2].value}</div>
-            <span className="px-2 py-0.5 rounded-full text-xs bg-green-900/20 text-green-400 dark:bg-green-900/40 mt-2 inline-block">+{stats[2].recent} Recent</span>
+            <Badge variant="success" className="mt-2 inline-block">+{stats[2].recent} Recent</Badge>
           </CardContent>
         </Card>
         {/* Pending Members */}
@@ -200,7 +201,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats[3].value}</div>
-            <span className="px-2 py-0.5 rounded-full text-xs bg-red-900/20 text-red-400 dark:bg-red-900/40 mt-2 inline-block">{stats[3].recentRejections} Recent Rejections</span>
+            <Badge variant="destructive" className="mt-2 inline-block">{stats[3].recentRejections} Recent Rejections</Badge>
           </CardContent>
         </Card>
       </div>
@@ -244,7 +245,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                     <TableRow key={idx}>
                       <TableCell className="font-medium">{fam.name}</TableCell>
                       <TableCell>{fam.description}</TableCell>
-                      <TableCell><span className="px-2 py-0.5 rounded-full text-xs bg-green-900/20 text-green-400 dark:bg-green-900/40">{fam.accessLevel}</span></TableCell>
+                      <TableCell><Badge variant="secondary">{fam.accessLevel}</Badge></TableCell>
                       <TableCell>{fam.membersAdded}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
@@ -284,7 +285,11 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                   filteredAccessRequests.map((req, idx) => (
                     <TableRow key={idx}>
                       <TableCell className="font-medium">{req.family}</TableCell>
-                      <TableCell><span className={`px-2 py-0.5 rounded-full text-xs bg-${req.statusColor}-900/20 text-${req.statusColor}-400 dark:bg-${req.statusColor}-900/40`}>{req.status}</span></TableCell>
+                      <TableCell>
+                        <Badge variant={req.statusColor === 'green' ? 'success' : req.statusColor === 'yellow' ? 'warning' : req.statusColor === 'red' ? 'destructive' : 'secondary'}>
+                          {req.status}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{req.date}</TableCell>
                     </TableRow>
                   ))
@@ -320,7 +325,11 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                     <TableRow key={idx}>
                       <TableCell className="font-medium">{mem.name}</TableCell>
                       <TableCell>{mem.family}</TableCell>
-                      <TableCell><span className={`px-2 py-0.5 rounded-full text-xs bg-${mem.statusColor}-900/20 text-${mem.statusColor}-400 dark:bg-${mem.statusColor}-900/40`}>{mem.status}</span></TableCell>
+                      <TableCell>
+                        <Badge variant={mem.statusColor === 'green' ? 'success' : mem.statusColor === 'yellow' ? 'warning' : mem.statusColor === 'red' ? 'destructive' : 'secondary'}>
+                          {mem.status}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{mem.date}</TableCell>
                     </TableRow>
                   ))
@@ -356,7 +365,11 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                     <TableRow key={idx}>
                       <TableCell className="font-medium">{hist.name}</TableCell>
                       <TableCell>{hist.family}</TableCell>
-                      <TableCell><span className={`px-2 py-0.5 rounded-full text-xs bg-${hist.statusColor}-900/20 text-${hist.statusColor}-400 dark:bg-${hist.statusColor}-900/40`}>{hist.status}</span></TableCell>
+                      <TableCell>
+                        <Badge variant={hist.statusColor === 'green' ? 'success' : hist.statusColor === 'yellow' ? 'warning' : hist.statusColor === 'red' ? 'destructive' : 'secondary'}>
+                          {hist.status}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{hist.date}</TableCell>
                     </TableRow>
                   ))

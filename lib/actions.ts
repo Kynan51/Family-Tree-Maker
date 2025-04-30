@@ -8,68 +8,126 @@ import { revalidatePath } from "next/cache"
 export async function createFamilyMember(member: FamilyMember) {
   const supabase = createAdminClient() // Admin operation
 
-  // Extract relationships to insert separately
-  const relationships = member.relationships || []
-  const memberWithoutRelationships = { ...member }
-  delete memberWithoutRelationships.relationships
-
-  // Insert family member
-  const { data: memberData, error: memberError } = await supabase
-    .from("family_members")
-    .insert(memberWithoutRelationships)
-    .select()
-    .single()
-
-  if (memberError) {
-    console.error("Error creating family member:", memberError)
-    throw new Error("Failed to create family member")
-  }
-
-  // Insert relationships
-  if (relationships.length > 0) {
-    const relationshipsWithMemberId = relationships.map((rel) => ({
-      ...rel,
-      memberId: memberData.id,
-    }))
-
-    const { error: relError } = await supabase.from("relationships").insert(relationshipsWithMemberId)
-
-    if (relError) {
-      console.error("Error creating relationships:", relError)
-      throw new Error("Failed to create relationships")
+  try {
+    // Validate required fields
+    if (!member.familyId) {
+      throw new Error("familyId is required")
+    }
+    if (!member.fullName) {
+      throw new Error("fullName is required")
+    }
+    if (!member.yearOfBirth) {
+      throw new Error("yearOfBirth is required")
+    }
+    if (!member.livingPlace) {
+      throw new Error("livingPlace is required")
     }
 
-    // Create reciprocal relationships
-    const reciprocalRelationships = relationships.map((rel) => {
-      let reciprocalType: "parent" | "child" | "spouse" = "spouse"
+    // Check for existing member with same details
+    const { data: existingMember, error: checkError } = await supabase
+      .from("family_members")
+      .select("*")
+      .eq("full_name", member.fullName)
+      .eq("year_of_birth", member.yearOfBirth)
+      .eq("living_place", member.livingPlace)
+      .eq("family_id", member.familyId)
+      .single()
 
-      if (rel.type === "parent") {
-        reciprocalType = "child"
-      } else if (rel.type === "child") {
-        reciprocalType = "parent"
-      }
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error("Error checking for existing member:", checkError)
+      throw new Error(`Failed to check for existing member: ${checkError.message}`)
+    }
 
-      return {
-        memberId: rel.relatedMemberId,
-        relatedMemberId: memberData.id,
-        type: reciprocalType,
-      }
-    })
+    // If member exists, return it instead of creating a new one
+    if (existingMember) {
+      console.log("Member already exists, returning existing member:", existingMember)
+      return existingMember
+    }
 
-    if (reciprocalRelationships.length > 0) {
-      const { error: recipError } = await supabase.from("relationships").insert(reciprocalRelationships)
+    // Extract relationships to insert separately
+    const relationships = member.relationships || []
+    const memberWithoutRelationships = { 
+      full_name: member.fullName,
+      year_of_birth: member.yearOfBirth,
+      living_place: member.livingPlace,
+      is_deceased: member.isDeceased,
+      marital_status: member.maritalStatus,
+      photo_url: member.photoUrl,
+      created_at: member.createdAt,
+      updated_at: member.updatedAt,
+      family_id: member.familyId
+    }
 
-      if (recipError) {
-        console.error("Error creating reciprocal relationships:", recipError)
-        throw new Error("Failed to create reciprocal relationships")
+    console.log("Inserting new member:", JSON.stringify(memberWithoutRelationships, null, 2))
+
+    // Insert family member
+    const { data: memberData, error: memberError } = await supabase
+      .from("family_members")
+      .insert(memberWithoutRelationships)
+      .select()
+      .single()
+
+    if (memberError) {
+      console.error("Error creating family member:", memberError)
+      console.error("Full error details:", JSON.stringify(memberError, null, 2))
+      throw new Error(`Failed to create family member: ${memberError.message}`)
+    }
+
+    // Insert relationships
+    if (relationships.length > 0) {
+      // Create all relationships in a single transaction
+      const allRelationships = relationships
+        .filter(rel => rel.relatedMemberId)
+        .flatMap(rel => {
+          const directRelationship = {
+            member_id: memberData.id,
+            related_member_id: rel.relatedMemberId,
+            type: rel.type,
+          }
+
+          let reciprocalType: "parent" | "child" | "spouse" = "spouse"
+          if (rel.type === "parent") {
+            reciprocalType = "child"
+          } else if (rel.type === "child") {
+            reciprocalType = "parent"
+          }
+
+          const reciprocalRelationship = {
+            member_id: rel.relatedMemberId,
+            related_member_id: memberData.id,
+            type: reciprocalType,
+          }
+
+          return [directRelationship, reciprocalRelationship]
+        })
+
+      if (allRelationships.length > 0) {
+        console.log("Inserting relationships:", JSON.stringify(allRelationships, null, 2))
+
+        // Use upsert to handle potential duplicates gracefully
+        const { error: relError } = await supabase
+          .from("relationships")
+          .upsert(allRelationships, {
+            onConflict: 'member_id,related_member_id,type',
+            ignoreDuplicates: true
+          })
+
+        if (relError) {
+          console.error("Error creating relationships:", relError)
+          console.error("Full relationship error details:", JSON.stringify(relError, null, 2))
+          throw new Error(`Failed to create relationships: ${relError.message}`)
+        }
       }
     }
+
+    revalidatePath("/tree")
+    revalidatePath("/admin")
+
+    return memberData
+  } catch (error) {
+    console.error("Error in createFamilyMember:", error)
+    throw error
   }
-
-  revalidatePath("/tree")
-  revalidatePath("/admin")
-
-  return memberData
 }
 
 export async function updateFamilyMember(member: FamilyMember) {
@@ -93,51 +151,75 @@ export async function updateFamilyMember(member: FamilyMember) {
     throw new Error("Failed to update family member")
   }
 
-  // Delete existing relationships
-  const { error: deleteError } = await supabase.from("relationships").delete().eq("memberId", member.id)
+  // Delete existing relationships for this member
+  const { error: deleteError } = await supabase
+    .from("relationships")
+    .delete()
+    .eq("member_id", member.id)
 
   if (deleteError) {
     console.error("Error deleting relationships:", deleteError)
-    throw new Error("Failed to update relationships")
+    throw new Error("Failed to delete relationships")
+  }
+
+  // Delete existing reciprocal relationships
+  const { error: deleteReciprocalError } = await supabase
+    .from("relationships")
+    .delete()
+    .eq("related_member_id", member.id)
+
+  if (deleteReciprocalError) {
+    console.error("Error deleting reciprocal relationships:", deleteReciprocalError)
+    throw new Error("Failed to delete reciprocal relationships")
   }
 
   // Insert new relationships
   if (relationships.length > 0) {
-    const relationshipsWithMemberId = relationships.map((rel) => ({
-      ...rel,
-      memberId: member.id,
-    }))
+    const relationshipsWithMemberId = relationships
+      .filter(rel => rel.relatedMemberId)
+      .map((rel) => ({
+        member_id: member.id,
+        related_member_id: rel.relatedMemberId,
+        type: rel.type,
+      }))
 
-    const { error: relError } = await supabase.from("relationships").insert(relationshipsWithMemberId)
+    if (relationshipsWithMemberId.length > 0) {
+      const { error: relError } = await supabase
+        .from("relationships")
+        .insert(relationshipsWithMemberId)
 
-    if (relError) {
-      console.error("Error creating relationships:", relError)
-      throw new Error("Failed to create relationships")
-    }
-
-    // Update reciprocal relationships
-    // First delete existing reciprocal relationships
-    await supabase.from("relationships").delete().eq("relatedMemberId", member.id)
-
-    // Create new reciprocal relationships
-    const reciprocalRelationships = relationships.map((rel) => {
-      let reciprocalType: "parent" | "child" | "spouse" = "spouse"
-
-      if (rel.type === "parent") {
-        reciprocalType = "child"
-      } else if (rel.type === "child") {
-        reciprocalType = "parent"
+      if (relError) {
+        console.error("Error creating relationships:", relError)
+        throw new Error("Failed to create relationships")
       }
 
-      return {
-        memberId: rel.relatedMemberId,
-        relatedMemberId: member.id,
-        type: reciprocalType,
-      }
-    })
+      // Create reciprocal relationships
+      const reciprocalRelationships = relationshipsWithMemberId.map((rel) => {
+        let reciprocalType: "parent" | "child" | "spouse" = "spouse"
 
-    if (reciprocalRelationships.length > 0) {
-      await supabase.from("relationships").insert(reciprocalRelationships)
+        if (rel.type === "parent") {
+          reciprocalType = "child"
+        } else if (rel.type === "child") {
+          reciprocalType = "parent"
+        }
+
+        return {
+          member_id: rel.related_member_id,
+          related_member_id: member.id,
+          type: reciprocalType,
+        }
+      })
+
+      if (reciprocalRelationships.length > 0) {
+        const { error: recipError } = await supabase
+          .from("relationships")
+          .insert(reciprocalRelationships)
+
+        if (recipError) {
+          console.error("Error creating reciprocal relationships:", recipError)
+          throw new Error("Failed to create reciprocal relationships")
+        }
+      }
     }
   }
 
@@ -151,10 +233,10 @@ export async function deleteFamilyMember(id: string) {
   const supabase = createAdminClient() // Admin operation
 
   // Delete relationships
-  await supabase.from("relationships").delete().eq("memberId", id)
+  await supabase.from("relationships").delete().eq("member_id", id)
 
   // Delete reciprocal relationships
-  await supabase.from("relationships").delete().eq("relatedMemberId", id)
+  await supabase.from("relationships").delete().eq("related_member_id", id)
 
   // Delete family member
   const { error } = await supabase.from("family_members").delete().eq("id", id)
@@ -402,4 +484,29 @@ export async function logExport(userId: string, exportType: string, familyId?: s
   }
 
   return true
+}
+
+export async function createAdminAccess(userId: string, familyId: string) {
+  const supabase = createAdminClient() // Admin operation
+
+  try {
+    const { error } = await supabase.from("user_family_access").insert({
+      user_id: userId,
+      family_id: familyId,
+      access_level: "admin",
+      status: "approved",
+      requested_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    if (error) {
+      console.error("Error creating admin access:", error)
+      throw new Error(`Failed to create admin access: ${error.message}`)
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in createAdminAccess:", error)
+    throw error
+  }
 }

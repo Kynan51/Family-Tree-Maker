@@ -67,7 +67,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 border rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+      <div ref={containerRef} className="flex-1 border rounded-lg overflow-hidden tree-canvas">
         <div
           style={{
             transform: `scale(${zoom})`,
@@ -77,7 +77,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
           }}
         >
           {view === "tree" ? (
-            <FamilyTreeD3 data={familyMembers.map(m => ({ ...m, name: m.fullName }))} />
+            <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} />
           ) : (
             <TimelineChart familyMembers={familyMembers} />
           )}

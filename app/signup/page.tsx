@@ -106,7 +106,7 @@ export default function SignUpPage() {
         <CardContent>
           {success ? (
             <div className="space-y-4">
-              <Alert variant="success">
+              <Alert variant="default">
                 <AlertTitle>Account Created!</AlertTitle>
                 <AlertDescription>
                   An activation link has been sent to your email or phone. Please check your inbox and follow the link to activate your account.

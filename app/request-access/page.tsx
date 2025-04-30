@@ -69,15 +69,8 @@ export default function RequestAccessPage() {
     }
 
     try {
-      const result = await requestFamilyAccess(session.user.id, selectedFamily.id)
-      
-      if (!result.success) {
-        setError(result.error || "Failed to request access. Please try again.")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Only navigate if the request was successful
+      await requestFamilyAccess(session.user.id, selectedFamily.id)
+      // If we get here, the request was successful
       router.push("/dashboard")
     } catch (err) {
       console.error("Error requesting access:", err)

@@ -1,15 +1,20 @@
 export interface FamilyMember {
   id: string
-  fullName: string
+  name: string
+  fullName?: string
   yearOfBirth: number
   livingPlace: string
   isDeceased: boolean
-  maritalStatus: "Single" | "Married" | "Divorced" | "Widowed"
-  photoUrl?: string
-  relationships?: Relationship[]
+  maritalStatus: string
+  photoUrl?: string | null
+  relationships?: Array<{
+    type: string
+    relatedMemberId: string
+  }>
   createdAt: string
   updatedAt: string
-  familyId?: string
+  familyId: string
+  occupation?: string
 }
 
 export interface Relationship {

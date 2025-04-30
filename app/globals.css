@@ -6,8 +6,8 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card: 0 0% 100%; /* white card background */
+    --card-foreground: 240 10% 3.9%; /* dark card text */
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
     --primary: 142 76% 36%;
@@ -15,59 +15,50 @@
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted-foreground: 240 3.8% 26.1%;
     --accent: 43 74% 39%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
+    --border: 240 5.9% 90%; /* subtle gray border */
     --input: 240 5.9% 90%;
     --ring: 142 76% 36%;
     --radius: 0.5rem;
+    /* Tree-specific variables */
+    --tree-canvas-bg: 0 0% 98%; /* very light gray for light mode canvas */
+    --tree-card-bg: var(--card);  /* use card background for tree card */
+    --tree-card-fg: var(--card-foreground); /* use card foreground for tree card */
   }
-
   .dark {
-    --background: 0 0% 0%;
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --card: 240 10% 3.9%; /* dark card background */
+    --card-foreground: 0 0% 98%; /* white card text */
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary: 142 76% 36%;
     --primary-foreground: 144.9 80.4% 10%;
-    --secondary: 144 3.7% 15.9%;
+    --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
+    --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     --accent: 43 74% 39%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
+    --border: 240 3.7% 15.9%; /* dark border */
     --input: 240 3.7% 15.9%;
     --ring: 142 76% 36%;
+    /* Tree-specific variables for dark mode */
+    --tree-canvas-bg: 240 10% 3.9%; /* dark background for dark mode */
+    --tree-card-bg: var(--card);   /* use card background for tree card */
+    --tree-card-fg: var(--card-foreground); /* use card foreground for tree card */
   }
 }
 
-/* Prevent flash of unstyled content */
-html {
-  background-color: var(--background);
-  color: var(--foreground);
-}
-
-html.dark {
-  background-color: #000;
-  color: #fff;
-}
-
-html.light {
-  background-color: #fff;
-  color: #000;
-}
-
 body {
-  background-color: inherit;
-  color: inherit;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 .animate-fade-in { animation: fadeIn 0.2s ease; }
@@ -84,13 +75,27 @@ body {
 
 /* For react-d3-tree link paths */
 .rd3t-link {
-  stroke: #888 !important; /* Light mode */
-}
-.dark .rd3t-link {
-  stroke: #bbb !important; /* Dark mode */
+  stroke: hsl(var(--muted-foreground)) !important;
 }
 
 /* Ensure SVG allows overflow for tooltips */
 .rd3t-svg {
   overflow: visible !important;
+}
+
+/* Card backgrounds and popovers */
+.card, .rd3t-node {
+  background-color: hsl(var(--tree-card-bg));
+  color: hsl(var(--tree-card-fg));
+  border: 1px solid hsl(var(--border));
+}
+
+.bg-popover {
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+}
+
+/* Tree canvas background */
+.tree-canvas {
+  background-color: hsl(var(--tree-canvas-bg));
 }
