@@ -22,8 +22,7 @@ import { formatDistanceToNow } from "date-fns"
 export function Header() {
   const { session, signOut } = useSupabaseAuth();
   const router = useRouter();
-  // Debug log for session and status
-  console.log("Header session:", session);
+  // console.log("Header session:", session);
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
   // Notification state (copied from user-dashboard)

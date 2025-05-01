@@ -47,6 +47,7 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
+        occupation: member.occupation
       }))
     }
 
@@ -73,6 +74,7 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
+        occupation: member.occupation
       }
     })
   } catch (error) {
@@ -114,6 +116,7 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
+        occupation: member.occupation
       }
     }
 
@@ -138,6 +141,7 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
       createdAt: member.created_at,
       updatedAt: member.updated_at,
       familyId: member.family_id,
+      occupation: member.occupation
     }
   } catch (error) {
     console.error("Error in getFamilyMemberById:", error)

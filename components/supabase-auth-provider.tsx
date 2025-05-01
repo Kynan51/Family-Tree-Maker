@@ -34,7 +34,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true)
 
   // Debug log on every render
-  console.log("[SupabaseAuthProvider] Rendered. Session:", session);
+  // console.log("[SupabaseAuthProvider] Rendered. Session:", session);
 
   const signIn = async (email: string, password: string) => {
     const supabase = createClient()

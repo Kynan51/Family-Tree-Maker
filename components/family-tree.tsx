@@ -30,17 +30,17 @@ export function FamilyTree({ members }: FamilyTreeProps) {
 
   const handleAddMember = (newMember: FamilyMember) => {
     // This would be handled by the parent component
-    console.log("New member added:", newMember)
+    // console.log("New member added:", newMember)
   }
 
   const handleUpdateMember = (updatedMember: FamilyMember) => {
     // This would be handled by the parent component
-    console.log("Member updated:", updatedMember)
+    // console.log("Member updated:", updatedMember)
   }
 
   const handleDeleteMember = (id: string) => {
     // This would be handled by the parent component
-    console.log("Member deleted:", id)
+    // console.log("Member deleted:", id)
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut } from "lucide-react"
@@ -13,15 +13,20 @@ import { ExportButton } from "@/components/export-button"
 interface FamilyTreeViewProps {
   familyMembers: FamilyMember[]
   isAdmin: boolean
-  familyId?: string
+  familyId: string
 }
 
 export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeViewProps) {
-  console.log("familyMembers prop:", familyMembers);
+  // console.log("familyMembers prop:", familyMembers);
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Log the family ID for debugging
+  useEffect(() => {
+    console.log('FamilyTreeView: familyId prop:', familyId);
+  }, [familyId]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.1, 2))
@@ -77,7 +82,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
           }}
         >
           {view === "tree" ? (
-            <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} />
+            <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} familyId={familyId} />
           ) : (
             <TimelineChart familyMembers={familyMembers} />
           )}
@@ -85,7 +90,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
       </div>
 
       {isAdmin && showAddDialog && (
-        <AddFamilyMemberDialog open={showAddDialog} onOpenChange={setShowAddDialog} existingMembers={familyMembers} />
+        <AddFamilyMemberDialog open={showAddDialog} onOpenChange={setShowAddDialog} existingMembers={familyMembers} familyId={familyId} />
       )}
     </div>
   )

@@ -25,6 +25,7 @@ const formSchema = z.object({
   isDeceased: z.boolean().default(false),
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
   photoUrl: z.string().optional(),
+  occupation: z.string().optional(),
 })
 
 interface EditFamilyMemberDialogProps {
@@ -60,6 +61,7 @@ export function EditFamilyMemberDialog({
       isDeceased: member.isDeceased,
       maritalStatus: member.maritalStatus,
       photoUrl: member.photoUrl || "",
+      occupation: member.occupation || "",
     },
   })
 
@@ -180,6 +182,7 @@ export function EditFamilyMemberDialog({
                     type="number"
                     value={form.watch("yearOfBirth")}
                     onChange={(e) => form.setValue("yearOfBirth", e.target.value)}
+                    placeholder="Year of birth (e.g. 1995)"
                     required
                   />
                 </div>
@@ -189,6 +192,15 @@ export function EditFamilyMemberDialog({
                     id="livingPlace"
                     value={form.watch("livingPlace")}
                     onChange={(e) => form.setValue("livingPlace", e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="occupation">Occupation</Label>
+                  <Input
+                    id="occupation"
+                    value={form.watch("occupation")}
+                    onChange={(e) => form.setValue("occupation", e.target.value)}
                     required
                   />
                 </div>

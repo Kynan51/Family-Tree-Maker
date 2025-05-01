@@ -16,73 +16,53 @@ interface FamilyTreePageProps {
 
 export default async function FamilyTreePage({ params }: FamilyTreePageProps) {
   const session = await getServerSession()
+  const supabase = createClient()
 
   if (!session) {
-    return <ClientAuthFallback />
+    redirect("/login")
   }
 
-  const supabase = createClient()
-  const isAdmin = session.user.role === "admin" || session.user.role === "super_admin"
-
-  // First check if the family exists and if it's public
+  // Get family data
   const { data: family, error: familyError } = await supabase
     .from("families")
-    .select("*, user_family_access!inner(*)")
+    .select("*")
     .eq("id", params.familyId)
     .single()
 
   if (familyError) {
     console.error("Error fetching family:", familyError)
-    return <div>Family not found</div>
+    return <div>Error loading family data</div>
   }
 
-  // Check if user has access to this family
-  const hasAccess =
-    family.is_public ||
-    family.user_family_access.some(
-      (access: FamilyAccess) => access.userId === session.user.id && access.status === "approved"
-    )
-
-  if (!hasAccess) {
-    return <div>You don't have access to this family tree</div>
-  }
-
-  // Get family members and their relationships
-  const { data: members, error } = await supabase
+  // Get family members
+  const { data: members, error: membersError } = await supabase
     .from("family_members")
-    .select("*, relationships:relationships!member_id(*)")
+    .select(`
+      *,
+      relationships:relationships!member_id(
+        type,
+        related_member:family_members!related_member_id(
+          full_name
+        )
+      )
+    `)
     .eq("family_id", params.familyId)
 
-  if (error && error.message) {
-    console.error("Error fetching family members:", error)
-    return <div>Error loading family tree: {error.message}</div>
+  if (membersError) {
+    console.error("Error fetching members:", membersError)
+    return <div>Error loading family members</div>
   }
 
-  // If members is null or undefined, treat as empty array
-  const safeMembers = (members ?? []).map((m: any) => ({
-    id: m.id,
-    name: m.name ?? m.full_name ?? "",
-    fullName: m.full_name,
-    yearOfBirth: m.year_of_birth,
-    livingPlace: m.living_place,
-    isDeceased: m.is_deceased,
-    maritalStatus: m.marital_status,
-    photoUrl: m.photo_url,
-    relationships: (m.relationships ?? []).map((r: any) => ({
-      type: r.type,
-      relatedMemberId: r.related_member_id
-    })),
-    createdAt: m.created_at,
-    updatedAt: m.updated_at,
-    familyId: m.family_id,
-    occupation: m.occupation,
+  // Transform the data for the tree view
+  const safeMembers = members || []
+  const transformedMembers = safeMembers.map((member) => ({
+    ...member,
+    name: member.full_name,
+    children: [],
   }))
 
-  // Debug log to inspect safeMembers and their relationships
-  console.log("safeMembers for FamilyTreeView:", safeMembers);
-  safeMembers.forEach(m => {
-    console.log(`Member: ${m.name}, id: ${m.id}, relationships:`, m.relationships);
-  });
+  // Log the family ID for debugging
+  console.log('Page component: familyId:', params.familyId)
 
   // If there are no members, show a root-member form
   if (safeMembers.length === 0) {
@@ -156,10 +136,11 @@ export default async function FamilyTreePage({ params }: FamilyTreePageProps) {
           <button type="submit" className="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold">Add Member</button>
         </form>
       </div>
-      <FamilyTreeView familyMembers={safeMembers.map(member => ({
-        ...member,
-        name: member.name ?? member.fullName ?? ""
-      }))} isAdmin={isAdmin} familyId={params.familyId} />
+      <FamilyTreeView 
+        familyMembers={transformedMembers} 
+        isAdmin={session.user.id === family.created_by} 
+        familyId={params.familyId}
+      />
     </div>
   )
 }

@@ -40,7 +40,7 @@ export async function createFamilyMember(member: FamilyMember) {
 
     // If member exists, return it instead of creating a new one
     if (existingMember) {
-      console.log("Member already exists, returning existing member:", existingMember)
+      // console.log("Member already exists, returning existing member:", existingMember)
       return existingMember
     }
 
@@ -55,10 +55,11 @@ export async function createFamilyMember(member: FamilyMember) {
       photo_url: member.photoUrl,
       created_at: member.createdAt,
       updated_at: member.updatedAt,
-      family_id: member.familyId
+      family_id: member.familyId,
+      occupation: member.occupation || null
     }
 
-    console.log("Inserting new member:", JSON.stringify(memberWithoutRelationships, null, 2))
+    // console.log("Inserting new member:", JSON.stringify(memberWithoutRelationships, null, 2))
 
     // Insert family member
     const { data: memberData, error: memberError } = await supabase
@@ -102,7 +103,7 @@ export async function createFamilyMember(member: FamilyMember) {
         })
 
       if (allRelationships.length > 0) {
-        console.log("Inserting relationships:", JSON.stringify(allRelationships, null, 2))
+        // console.log("Inserting relationships:", JSON.stringify(allRelationships, null, 2))
 
         // Use upsert to handle potential duplicates gracefully
         const { error: relError } = await supabase

@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from "uuid"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminAccess } from "@/lib/actions"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -29,6 +30,7 @@ const formSchema = z.object({
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
   photoUrl: z.string().optional(),
   isAdmin: z.boolean().default(false),
+  occupation: z.string().optional(),
 })
 
 interface AddFamilyMemberDialogProps {
@@ -60,20 +62,26 @@ export function AddFamilyMemberDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullName: "",
-      yearOfBirth: new Date().getFullYear() - 30,
+      yearOfBirth: undefined,
       livingPlace: "",
       isDeceased: false,
       maritalStatus: "Single",
       photoUrl: "",
       isAdmin: false,
+      occupation: undefined,
     },
   })
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)
-    console.log("Form values:", values); // Debug log
+    // console.log("Form values:", values); // Debug log
 
     try {
+      // Validate required fields
+      if (!values.fullName) {
+        throw new Error("Full name is required")
+      }
+
       // Create relationships array
       const relationships: Relationship[] = []
 
@@ -132,7 +140,7 @@ export function AddFamilyMemberDialog({
         }
       }
 
-      console.log("Creating relationships:", relationships); // Debug log
+      // console.log("Creating relationships:", relationships); // Debug log
 
       // Create new family member
       const newMember: FamilyMember = {
@@ -144,13 +152,19 @@ export function AddFamilyMemberDialog({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         familyId: source === 'card' && selectedMember ? selectedMember.familyId : familyId,
+        occupation: values.occupation || "",
       }
 
-      console.log("New member object before creation:", newMember); // Debug log
+      // Validate the member object before sending to server
+      if (!newMember.fullName) {
+        throw new Error("Full name is required")
+      }
+
+      // console.log("New member object before creation:", newMember); // Debug log
 
       // Save to database
       const createdMember = await createFamilyMember(newMember)
-      console.log("Created member from server:", createdMember);
+      // console.log("Created member from server:", createdMember);
 
       // Transform server response to match client-side type
       const transformedMember: FamilyMember = {
@@ -167,9 +181,10 @@ export function AddFamilyMemberDialog({
         updatedAt: createdMember.updated_at,
         familyId: createdMember.family_id,
         isAdmin: values.isAdmin,
+        occupation: values.occupation || "",
       }
 
-      console.log("Transformed member for client:", transformedMember); // Debug log
+      // console.log("Transformed member for client:", transformedMember); // Debug log
 
       // If admin access is requested and member is not deceased, create admin access
       if (values.isAdmin && !values.isDeceased) {
@@ -291,7 +306,7 @@ export function AddFamilyMemberDialog({
                     <FormItem>
                       <FormLabel>Year of Birth</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Enter year of birth" {...field} />
+                        <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -308,6 +323,22 @@ export function AddFamilyMemberDialog({
                       <FormLabel>Living Place</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter living place" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="occupation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Occupation</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter occupation (optional)" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -423,7 +454,7 @@ export function AddFamilyMemberDialog({
                         <FormItem>
                           <FormLabel>Year of Birth</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="Enter year of birth" {...field} />
+                            <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -440,6 +471,22 @@ export function AddFamilyMemberDialog({
                           <FormLabel>Living Place</FormLabel>
                           <FormControl>
                             <Input placeholder="Enter living place" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <FormField
+                      control={form.control}
+                      name="occupation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Occupation</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter occupation (optional)" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -531,27 +578,22 @@ export function AddFamilyMemberDialog({
                     {existingMembers.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
                     ) : (
-                      existingMembers.map((member) => (
-                        <div key={member.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`parent-${member.id}`}
-                            checked={selectedParents.includes(member.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedParents((prev) => [...prev, member.id])
-                              } else {
-                                setSelectedParents((prev) => prev.filter((id) => id !== member.id))
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`parent-${member.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {member.fullName} (b. {member.yearOfBirth})
-                          </label>
-                        </div>
-                      ))
+                      <RadioGroup
+                        value={selectedParents[0] || ""}
+                        onValueChange={(value) => setSelectedParents([value])}
+                      >
+                        {existingMembers.map((member) => (
+                          <div key={member.id} className="flex items-center space-x-2">
+                            <RadioGroupItem value={member.id} id={`parent-${member.id}`} />
+                            <label
+                              htmlFor={`parent-${member.id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {member.name || member.fullName} ({member.yearOfBirth})
+                            </label>
+                          </div>
+                        ))}
+                      </RadioGroup>
                     )}
                   </div>
                 </div>
@@ -562,27 +604,22 @@ export function AddFamilyMemberDialog({
                     {existingMembers.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
                     ) : (
-                      existingMembers.map((member) => (
-                        <div key={member.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`spouse-${member.id}`}
-                            checked={selectedSpouse === member.id}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedSpouse(member.id)
-                              } else {
-                                setSelectedSpouse(null)
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`spouse-${member.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {member.fullName} (b. {member.yearOfBirth})
-                          </label>
-                        </div>
-                      ))
+                      <RadioGroup
+                        value={selectedSpouse || ""}
+                        onValueChange={(value) => setSelectedSpouse(value)}
+                      >
+                        {existingMembers.map((member) => (
+                          <div key={member.id} className="flex items-center space-x-2">
+                            <RadioGroupItem value={member.id} id={`spouse-${member.id}`} />
+                            <label
+                              htmlFor={`spouse-${member.id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                              {member.name || member.fullName} ({member.yearOfBirth})
+                            </label>
+                          </div>
+                        ))}
+                      </RadioGroup>
                     )}
                   </div>
                 </div>

@@ -8,6 +8,21 @@ import ReactDOM from "react-dom"
 import { createFamilyMember } from "@/lib/actions"
 import { toast } from "@/components/ui/use-toast"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
+import { Tree, TreeNodeDatum, Point } from 'react-d3-tree'
+import { FamilyMember as LibFamilyMember } from "@/lib/types"
+
+// Add this interface at the top of the file
+interface WindowWithFamilyId extends Window {
+  familyId?: string;
+  __tree_node_positions__?: Record<string, NodePosition>;
+  __tree_members_state__?: FamilyMember[];
+}
+
+interface NodePosition {
+  x: number;
+  y: number;
+  raw: any; // This is the actual member data
+}
 
 // Tooltip component
 function Tooltip({ person }: { person: any }) {
@@ -34,27 +49,21 @@ function Tooltip({ person }: { person: any }) {
 }
 
 // Dynamically import react-d3-tree to avoid SSR issues
-const Tree = dynamic(() => import("react-d3-tree").then(mod => mod.Tree), { ssr: false })
+const TreeComponent = dynamic(() => import("react-d3-tree").then(mod => mod.Tree), { ssr: false })
 
-interface FamilyMember {
-  id: string
-  name: string
-  yearOfBirth: number
-  livingPlace: string
+interface FamilyMember extends LibFamilyMember {
   generation: number
-  isDeceased: boolean
-  relation?: string
   partner?: FamilyMember
+  partners?: FamilyMember[]
   children?: FamilyMember[]
-  occupation?: string
-  fullName?: string
 }
 
 interface FamilyTreeD3Props {
   data: FamilyMember[]
+  isAdmin: boolean
+  familyId: string
 }
 
-// Hook to detect dark mode
 function useIsDarkMode() {
   const [isDark, setIsDark] = useState(false)
   useEffect(() => {
@@ -68,7 +77,6 @@ function useIsDarkMode() {
   return isDark
 }
 
-// Transform your data to the format react-d3-tree expects
 function transformToD3Tree(members: FamilyMember[]): any[] {
   return members.map(member => ({
     name: member.name,
@@ -78,7 +86,7 @@ function transformToD3Tree(members: FamilyMember[]): any[] {
       isDeceased: member.isDeceased ? "Deceased" : "Alive",
       relation: member.maritalStatus || "",
       occupation: member.occupation ?? null,
-      partners: (member.partners || []).map(partner => ({
+      partners: (member.partners || []).map((partner: FamilyMember) => ({
         name: partner.name,
         yearOfBirth: partner.yearOfBirth,
         livingPlace: partner.livingPlace,
@@ -92,14 +100,15 @@ function transformToD3Tree(members: FamilyMember[]): any[] {
   }))
 }
 
-// Utility: Convert flat FamilyMember[] with relationships to nested structure
-function buildNestedFamilyTree(flatMembers: any[]): any[] {
-  console.log('=== Starting Tree Build ===')
-  console.log('Input members:', flatMembers.map(m => ({ id: m.id, name: m.name, relationships: m.relationships })))
+interface Relationship {
+  type: 'parent' | 'spouse' | 'child'
+  relatedMemberId: string
+}
 
+function buildNestedFamilyTree(flatMembers: FamilyMember[]): FamilyMember[] {
   // Create a map of all members, using the first occurrence of each member
-  const memberMap = new Map()
-  const processedRelationships = new Set()
+  const memberMap = new Map<string, FamilyMember>()
+  const processedRelationships = new Set<string>()
   
   // First pass: create unique member objects
   flatMembers.forEach(m => {
@@ -113,60 +122,33 @@ function buildNestedFamilyTree(flatMembers: any[]): any[] {
     }
   })
   
-  console.log('Initial member map:', Array.from(memberMap.entries()).map(([id, m]) => ({ id, name: m.name })))
-  
   // Second pass: handle relationships
   flatMembers.forEach(member => {
-    console.log(`\nProcessing member: ${member.name} (${member.id})`)
-    
-    if (!member.relationships) {
-      console.log('No relationships found for member')
-      return
-    }
-    
-    const currentMember = memberMap.get(member.id)
-    if (!currentMember) {
-      console.log('Member not found in map')
-      return
-    }
-    
-    member.relationships.forEach(rel => {
+    if (!member.relationships) return;
+    member.relationships.forEach((rel: { type: string; relatedMemberId: string }) => {
       // Create a consistent key for bidirectional relationships
       const [id1, id2] = [member.id, rel.relatedMemberId].sort()
       const relationshipKey = `${id1}-${id2}-${rel.type}`
       
       if (processedRelationships.has(relationshipKey)) {
-        console.log(`Relationship already processed: ${relationshipKey}`)
         return
       }
       
-      console.log(`\nProcessing relationship:`, rel)
       const relatedMember = memberMap.get(rel.relatedMemberId)
       if (!relatedMember) {
-        console.log('Related member not found in map')
         return
       }
       
       if (rel.type === "parent") {
-        console.log(`Parent relationship found: ${member.name} -> ${relatedMember.name}`)
         // Only add child if it hasn't been processed yet
-        if (!currentMember.children.some(c => c.id === relatedMember.id)) {
-          console.log(`Adding child: ${relatedMember.name} to ${member.name}`)
-          currentMember.children.push(relatedMember)
-          processedRelationships.add(relationshipKey)
-        } else {
-          console.log(`Child ${relatedMember.name} already added, skipping`)
+        if (!memberMap.get(member.id)?.children?.some((c: FamilyMember) => c.id === relatedMember.id)) {
+          memberMap.get(member.id)?.children?.push(relatedMember)
           processedRelationships.add(relationshipKey)
         }
       } else if (rel.type === "spouse") {
-        console.log(`Spouse relationship found: ${member.name} <-> ${relatedMember.name}`)
         // Only add spouse if not already added
-        if (!currentMember.partners.some(p => p.id === relatedMember.id)) {
-          console.log(`Adding spouse: ${relatedMember.name} to ${member.name}`)
-          currentMember.partners.push(relatedMember)
-          processedRelationships.add(relationshipKey)
-        } else {
-          console.log(`Spouse ${relatedMember.name} already added, skipping`)
+        if (!memberMap.get(member.id)?.partners?.some((p: FamilyMember) => p.id === relatedMember.id)) {
+          memberMap.get(member.id)?.partners?.push(relatedMember)
           processedRelationships.add(relationshipKey)
         }
       }
@@ -176,35 +158,14 @@ function buildNestedFamilyTree(flatMembers: any[]): any[] {
   // Find root members (those who are not children of any other member)
   const roots = Array.from(memberMap.values()).filter(member => {
     const isChild = Array.from(memberMap.values()).some(m => 
-      m.children.some(c => c.id === member.id)
+      m.children?.some((c: FamilyMember) => c.id === member.id)
     )
     return !isChild
   })
   
-  console.log('\n=== Final Tree Structure ===')
-  console.log('Processed relationships:', Array.from(processedRelationships))
-  console.log('Root members:', roots.map(r => ({ id: r.id, name: r.name })))
-  
-  // Log the complete tree structure
-  function logTree(member: any, depth = 0) {
-    const indent = '  '.repeat(depth)
-    console.log(`${indent}${member.name} (${member.id})`)
-    if (member.partners.length > 0) {
-      console.log(`${indent}  Partners: ${member.partners.map(p => p.name).join(', ')}`)
-    }
-    if (member.children.length > 0) {
-      console.log(`${indent}  Children:`)
-      member.children.forEach(child => logTree(child, depth + 2))
-    }
-  }
-  
-  console.log('\n=== Complete Tree Structure ===')
-  roots.forEach(root => logTree(root))
-  
   return roots
 }
 
-// Restore previous node rendering with partners, tooltips, and add-member button
 function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   const isDark = useIsDarkMode()
   const [showTooltip, setShowTooltip] = useState(false)
@@ -245,6 +206,14 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       })}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
+      data-tooltip={JSON.stringify({
+        name: nodeDatum.name,
+        yearOfBirth: nodeDatum.attributes.yearOfBirth,
+        livingPlace: nodeDatum.attributes.livingPlace,
+        occupation: nodeDatum.attributes.occupation,
+        isDeceased: nodeDatum.attributes.isDeceased,
+        relation: nodeDatum.attributes.relation
+      })}
     >
       <Card className="flex flex-col items-center justify-between shadow-sm p-2 rounded-lg w-[160px] h-[140px]">
         <div className="flex flex-col items-center w-full">
@@ -277,6 +246,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       onMouseEnter={e => handleMouseEnter(e, partner)}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', alignItems: 'center' }}
+      data-tooltip={JSON.stringify(partner)}
     >
       <Card className="flex flex-col items-center justify-between shadow-sm p-2 rounded-lg w-[160px] h-[140px]">
         <div className="flex flex-col items-center w-full gap-1">
@@ -298,6 +268,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       onMouseEnter={e => handleMouseEnter(e, partner)}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', alignItems: 'center' }}
+      data-tooltip={JSON.stringify(partner)}
     >
       <span className="mx-1 text-lg font-bold text-muted-foreground">+</span>
       <Card className="flex flex-col items-center justify-between shadow-sm p-2 rounded-lg w-[160px] h-[140px]">
@@ -369,7 +340,6 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   )
 }
 
-// Normalization function to map backend fields to frontend fields
 function normalizeMembers(members: any[]): any[] {
   const normalizedData = members.map(m => {
     const name = m.name ?? m.full_name ?? "";
@@ -391,17 +361,16 @@ function normalizeMembers(members: any[]): any[] {
   return normalizedData;
 }
 
-// Add custom SVG overlay for sibling connectors
 function SiblingConnectorOverlay({ nodePositions, membersState }: { nodePositions: any, membersState: any[] }) {
   if (!nodePositions) return null
   // Find all parents with more than one child
   const parentToChildren: Record<string, any[]> = {}
   membersState.forEach(member => {
     if (member.relationships) {
-      member.relationships.forEach(rel => {
+      member.relationships.forEach((rel: Relationship) => {
         if (rel.type === 'parent') {
-          if (!parentToChildren[rel.related_member_id]) parentToChildren[rel.related_member_id] = []
-          parentToChildren[rel.related_member_id].push(member.id)
+          if (!parentToChildren[rel.relatedMemberId]) parentToChildren[rel.relatedMemberId] = []
+          parentToChildren[rel.relatedMemberId].push(member.id)
         }
       })
     }
@@ -447,8 +416,8 @@ function SiblingConnectorOverlay({ nodePositions, membersState }: { nodePosition
               <line
                 x1={nodePositions[parentId].x}
                 y1={nodePositions[parentId].y + 45}
-                x2={childNodes[0].x}
                 y2={y}
+                x2={childNodes[0].x}
                 stroke="#888"
                 strokeWidth={2}
               />
@@ -460,27 +429,46 @@ function SiblingConnectorOverlay({ nodePositions, membersState }: { nodePosition
   )
 }
 
-export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { isAdmin?: boolean }) {
-  console.log('FamilyTreeD3: isAdmin =', isAdmin);
-  console.log("FamilyTreeD3 data:", data);
-  // Debug log in browser for each member
+interface FormState {
+  fullName: string
+  yearOfBirth: string
+  livingPlace: string
+  maritalStatus: string
+  occupation: string
+  isDeceased: string
+}
+
+export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
+  const svgRef = useRef<HTMLDivElement>(null)
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({})
+
+  // Set family ID in window object for export functionality
   useEffect(() => {
-    console.log("🌳 [Browser] FamilyTreeD3 data:", data);
-    data.forEach(m => {
-      console.log(`🌳 Member: ${m.name} | id: ${m.id} | relationships:`, m.relationships);
-    });
-  }, [data]);
+    if (familyId) {
+      console.log('FamilyTreeD3: Setting familyId in window:', familyId)
+      ;(window as WindowWithFamilyId).familyId = familyId
+    }
+  }, [familyId])
+
   // Consolidate state for add member functionality
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [selectedNode, setSelectedNode] = useState<any>(null)
+  const [form, setForm] = useState<FormState>({
+    fullName: '',
+    yearOfBirth: '',
+    livingPlace: '',
+    maritalStatus: 'Single',
+    occupation: '',
+    isDeceased: 'false',
+  })
   
   // Normalize data before using it in state
   const normalizedData = useMemo(() => normalizeMembers(data), [data]);
   const [membersState, setMembersState] = useState(normalizedData)
   const isDark = useIsDarkMode()
-  const [nodePositions, setNodePositions] = useState<{[id: string]: {x: number, y: number, raw: any}} | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<HTMLDivElement>(null)
 
   // Update membersState when data prop changes
   useEffect(() => {
@@ -491,9 +479,7 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
 
   // Convert flat data to nested tree
   const nestedData = useMemo(() => buildNestedFamilyTree(membersState), [membersState])
-  console.log("nestedData:", nestedData);
   const treeData = useMemo(() => transformToD3Tree(nestedData), [nestedData])
-  console.log("treeData:", treeData);
 
   // Center the tree horizontally
   const translate = { x: 400, y: 100 }
@@ -501,22 +487,48 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
   // Handler to capture node positions from react-d3-tree
   const handleTreeUpdate = (treeData: any, nodes: any) => {
     if (!Array.isArray(nodes)) return;
-    const positions: {[id: string]: {x: number, y: number, raw: any}} = {}
+    const positions: Record<string, NodePosition> = {}
     nodes.forEach((node: any) => {
       if (node.data && node.data.raw && node.data.raw.id) {
         positions[node.data.raw.id] = { x: node.x, y: node.y, raw: node.data.raw }
       }
     })
     setNodePositions(positions)
+    
+    // Expose to window for export functionality
+    if (typeof window !== 'undefined') {
+      (window as any).__tree_node_positions__ = positions;
+      (window as any).__tree_members_state__ = membersState;
+      // Get family ID from the first member's data
+      const familyId = membersState[0]?.familyId;
+      if (familyId) {
+        console.log('Setting family ID in window:', familyId);
+        (window as any).__tree_family_id__ = familyId;
+      }
+    }
   }
+
+  // Update window object whenever membersState changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && nodePositions) {
+      (window as any).__tree_node_positions__ = nodePositions;
+      (window as any).__tree_members_state__ = membersState;
+      // Get family ID from the first member's data
+      const familyId = membersState[0]?.familyId;
+      if (familyId) {
+        console.log('Setting family ID in window:', familyId);
+        (window as any).__tree_family_id__ = familyId;
+      }
+    }
+  }, [nodePositions, membersState])
 
   // Collect all spouse links
   const spouseLinks: {source: string, target: string}[] = []
   membersState.forEach(member => {
     if (member.relationships) {
-      member.relationships.forEach(rel => {
-        if (rel.type === 'spouse' && member.id < rel.related_member_id) {
-          spouseLinks.push({ source: member.id, target: rel.related_member_id })
+      member.relationships.forEach((rel: Relationship) => {
+        if (rel.type === 'spouse' && member.id < rel.relatedMemberId) {
+          spouseLinks.push({ source: member.id, target: rel.relatedMemberId })
         }
       })
     }
@@ -574,7 +586,7 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
             <button
               className="ml-2 px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded flex items-center gap-1 shadow"
               style={{ pointerEvents: 'auto', height: 36, alignSelf: 'center' }}
-              onClick={() => { if (main) setSelectedNode(main); setShowAddDialog(true); }}
+              onClick={() => { if (main) setSelectedMember(main); setShowAddDialog(true); }}
             >
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add Member
@@ -587,23 +599,30 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
 
   // Handler for add member button clicks
   const handleAddMemberClick = (node: any) => {
-    setSelectedNode(node.raw) // Use node.raw to get the actual member data
+    setSelectedMember(node.raw) // Use node.raw to get the actual member data
     setShowAddDialog(true)
   }
 
   // Handler for adding a new member
   const handleAddMember = async (newMember: FamilyMember) => {
     try {
-      if (!selectedNode) return;
+      if (!selectedMember) return;
 
       // Create the new member with relationship to the selected node
-      const memberToAdd = {
-        ...newMember,
-        familyId: selectedNode.familyId, // Ensure familyId is passed
+      const memberToAdd: LibFamilyMember = {
+        id: newMember.id,
+        name: newMember.name,
+        yearOfBirth: newMember.yearOfBirth,
+        livingPlace: newMember.livingPlace,
+        isDeceased: newMember.isDeceased,
+        maritalStatus: newMember.maritalStatus || 'Single',
+        familyId: selectedMember.familyId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         relationships: [
           {
-            type: 'child',
-            relatedMemberId: selectedNode.id
+            type: 'child' as const,
+            relatedMemberId: selectedMember.id
           }
         ]
       }
@@ -612,11 +631,18 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
       const createdMember = await createFamilyMember(memberToAdd)
 
       // Update local state with the created member
-      setMembersState(prev => [...prev, createdMember])
+      const memberWithGeneration: FamilyMember = {
+        ...createdMember,
+        generation: selectedMember.generation + 1,
+        partner: undefined,
+        partners: [],
+        children: []
+      }
+      setMembersState(prev => [...prev, memberWithGeneration])
 
       // Close dialog and clean up
       setShowAddDialog(false)
-      setSelectedNode(null)
+      setSelectedMember(null)
 
       // Show success message
       toast({
@@ -711,7 +737,7 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
 
   return (
     <div className="relative w-full h-full" ref={svgRef}>
-      <Tree
+      <TreeComponent
         data={treeData}
         translate={translate}
         orientation="vertical"
@@ -725,56 +751,75 @@ export function FamilyTreeD3({ data, isAdmin = false }: FamilyTreeD3Props & { is
         pathFunc={(linkData) => {
           const { source, target } = linkData;
           
-          // Precise measurements for card connections
+          // Calculate connection points from the center of cards
           const sourceX = source.x;
-          const sourceY = source.y + 70;  // Bottom center of parent card
+          const sourceY = source.y + 70; // Bottom of parent card
           const targetX = target.x;
-          const targetY = target.y - 70;  // Top center of child card
+          const targetY = target.y - 70; // Top of child card
           
-          // Calculate the middle point exactly halfway between parent and child
+          // Calculate control points for the curve
           const midY = sourceY + (targetY - sourceY) / 2;
           
-          // Create a clean path with three segments:
-          // 1. Straight down from parent
-          // 2. Horizontal connection
-          // 3. Straight up to child
+          // Create a smooth curved path using cubic bezier
           return `
             M ${sourceX} ${sourceY}
-            L ${sourceX} ${midY}
+            C ${sourceX} ${sourceY + 20},
+              ${sourceX} ${midY - 20},
+              ${sourceX} ${midY}
             L ${targetX} ${midY}
-            L ${targetX} ${targetY}
-          `.trim().replace(/\s+/g, ' ');
+            C ${targetX} ${midY + 20},
+              ${targetX} ${targetY - 20},
+              ${targetX} ${targetY}
+          `.trim();
         }}
         zoomable={true}
         collapsible={false}
         nodeSize={{ x: 220, y: 200 }}
         separation={{ siblings: 1.5, nonSiblings: 2 }}
         enableLegacyTransitions={true}
-        styles={{
-          links: {
-            stroke: isDark ? "#bbb" : "#888",
-            strokeWidth: 2,
-          },
+        pathClassFunc={() => isDark ? "link-dark" : "link-light"}
+        onUpdate={(target: { node: TreeNodeDatum | null; zoom: number; translate: Point }) => {
+          if (target.node) {
+            handleTreeUpdate(treeData, [target.node])
+          }
         }}
-        onUpdate={handleTreeUpdate}
       />
+      <style jsx global>{`
+        .link-dark {
+          stroke: #bbb;
+          stroke-width: 2;
+        }
+        .link-light {
+          stroke: #888;
+          stroke-width: 2;
+        }
+      `}</style>
       <div ref={overlayRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 20 }}>
         {renderOverlay()}
       </div>
 
       {/* Add Member Dialog */}
-      {showAddDialog && selectedNode && (
+      {showAddDialog && selectedMember && (
         <AddFamilyMemberDialog
           open={showAddDialog}
           onOpenChange={(open) => {
             setShowAddDialog(open)
-            if (!open) setSelectedNode(null)
+            if (!open) setSelectedMember(null)
           }}
           existingMembers={membersState}
-          onAdd={handleAddMember}
+          onAdd={(member: LibFamilyMember) => {
+            const memberWithGeneration: FamilyMember = {
+              ...member,
+              generation: selectedMember.generation + 1,
+              partner: undefined,
+              partners: [],
+              children: []
+            };
+            handleAddMember(memberWithGeneration);
+          }}
           source="card"
-          selectedMember={selectedNode}
-          familyId={selectedNode.familyId}
+          selectedMember={selectedMember}
+          familyId={selectedMember.familyId}
         />
       )}
     </div>
