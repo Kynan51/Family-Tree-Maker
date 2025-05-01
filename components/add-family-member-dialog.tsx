@@ -41,6 +41,7 @@ interface AddFamilyMemberDialogProps {
   source?: 'card' | 'dashboard'
   selectedMember?: FamilyMember
   familyId: string
+  isAdmin?: boolean
 }
 
 export function AddFamilyMemberDialog({ 
@@ -50,7 +51,8 @@ export function AddFamilyMemberDialog({
   onAdd,
   source = 'dashboard',
   selectedMember,
-  familyId
+  familyId,
+  isAdmin = false
 }: AddFamilyMemberDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [relationshipType, setRelationshipType] = useState<'child' | 'parent' | 'spouse'>('child')
@@ -392,26 +394,27 @@ export function AddFamilyMemberDialog({
                 />
               </div>
 
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="isAdmin"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={form.watch("isDeceased")}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Make Admin</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {isAdmin && !form.watch("isDeceased") && (
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="isAdmin"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Make Admin</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <DialogFooter>
                 <Button type="submit" disabled={isSubmitting}>

@@ -39,14 +39,44 @@ export default async function DashboardPage() {
   // Get user's accessible families that are approved
   const { data: accessibleFamilies } = await supabase
     .from("families")
-    .select("*")
+    .select("*, members:family_members(*), admins:user_family_access!inner(user_id)")
     .in("id", accessRequests?.filter(req => req.status === "approved").map(req => req.family_id) || [])
+
+  // Get user's family access information
+  const { data: userFamilyAccess } = await supabase
+    .from("user_family_access")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .eq("status", "approved")
+
+  // Debug logging
+  console.log("Dashboard Debug Info:", {
+    userId: session.user.id,
+    userRole: session.user.role,
+    accessibleFamilies: accessibleFamilies?.map(f => ({
+      id: f.id,
+      name: f.name,
+      created_by: f.created_by,
+      admins: f.admins?.map(a => a.user_id) || []
+    })),
+    userFamilyAccess: userFamilyAccess?.map(a => ({
+      familyId: a.family_id,
+      accessLevel: a.access_level,
+      status: a.status
+    })),
+    accessRequests: accessRequests?.map(r => ({
+      familyId: r.family_id,
+      accessLevel: r.access_level,
+      status: r.status
+    }))
+  })
 
   return (
     <UserDashboard
       userId={session.user.id}
       accessibleFamilies={accessibleFamilies || []}
       accessRequests={accessRequests || []}
+      userFamilyAccess={userFamilyAccess || []}
     />
   )
 }

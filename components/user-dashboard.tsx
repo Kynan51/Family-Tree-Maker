@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserPlus, CheckCircle, Clock, ShieldCheck, User2 } from "lucide-react"
+import { User2, Pencil, Trash, Check, X } from "lucide-react"
 import type { Family, FamilyAccess } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
 
 interface UserDashboardProps {
   userId: string
@@ -16,369 +16,331 @@ interface UserDashboardProps {
   accessRequests: (FamilyAccess & { family: Family })[]
 }
 
-const TABS = [
-  { label: "My Families" },
-  { label: "Access Requests" },
-  { label: "My Members" },
-  { label: "Approval History" },
-]
-
 export function UserDashboard({ userId, accessibleFamilies, accessRequests }: UserDashboardProps) {
-  // Dummy data for stats (replace with real data as needed)
-  const stats = [
-    {
-      title: "Family Trees",
-      value: 0,
-      approved: 1,
-      pending: 0,
-      icon: <Users className="h-5 w-5 text-primary" />,
-    },
-    {
-      title: "Members Added",
-      value: 0,
-      approvalRate: 0,
-      icon: <UserPlus className="h-5 w-5 text-primary" />,
-    },
-    {
-      title: "Approved Members",
-      value: 0,
-      recent: 0,
-      icon: <CheckCircle className="h-5 w-5 text-primary" />,
-    },
-    {
-      title: "Pending Members",
-      value: 0,
-      recentRejections: 0,
-      icon: <Clock className="h-5 w-5 text-primary" />,
-    },
-  ]
-
-  const [activeTab, setActiveTab] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
+  const [activeTab, setActiveTab] = useState("my-families")
+  const [selectedFamily, setSelectedFamily] = useState<string | null>(null)
 
-  // Placeholder data for each tab
-  const myFamiliesData = [
-    {
-      name: "Lucky",
-      description: "This family is based in Uganda, our surnames are Lucky, although we are unlucky in matters wealth. We are rich in other immeasurable ways 🎯",
-      accessLevel: "admin",
-      membersAdded: "0 (Pending: 0)",
-    },
-  ];
-  const accessRequestsData = [
-    {
-      family: "Lucky",
-      status: "Pending",
-      statusColor: "yellow",
-      date: "2024-06-01",
-    },
-    {
-      family: "Smith",
-      status: "Approved",
-      statusColor: "green",
-      date: "2024-05-20",
-    },
-  ];
-  const myMembersData = [
-    {
-      name: "John Lucky",
-      family: "Lucky",
-      status: "Approved",
-      statusColor: "green",
-      date: "2024-05-15",
-    },
-    {
-      name: "Jane Smith",
-      family: "Smith",
-      status: "Pending",
-      statusColor: "yellow",
-      date: "2024-06-02",
-    },
-  ];
-  const approvalHistoryData = [
-    {
-      name: "John Lucky",
-      family: "Lucky",
-      status: "Approved",
-      statusColor: "green",
-      date: "2024-05-15",
-    },
-    {
-      name: "Jane Smith",
-      family: "Smith",
-      status: "Rejected",
-      statusColor: "red",
-      date: "2024-06-03",
-    },
-  ];
+  // Check if user is admin in any family
+  const isAdminInAnyFamily = accessibleFamilies.some(family => {
+    const isCreator = family.created_by === userId;
+    const isInAdmins = family.admins?.some(admin => admin.user_id === userId);
+    const hasAdminAccess = accessRequests.some(access => 
+      access.familyId === family.id && 
+      access.accessLevel === "admin" && 
+      access.status === "approved"
+    );
 
-  // Filtered data for each tab
-  const filteredMyFamilies = myFamiliesData.filter(fam =>
-    fam.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    fam.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    fam.accessLevel.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredAccessRequests = accessRequestsData.filter(req =>
-    req.family.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    req.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredMyMembers = myMembersData.filter(mem =>
-    mem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mem.family.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    mem.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredApprovalHistory = approvalHistoryData.filter(hist =>
-    hist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    hist.family.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    hist.status.toLowerCase().includes(searchQuery.toLowerCase())
+    return isCreator || isInAdmins || hasAdminAccess;
+  });
+
+  // Get all members from accessible families
+  const allFamilyMembers = accessibleFamilies.flatMap(family => 
+    (family.members || []).map(member => ({
+      ...member,
+      name: member.full_name,
+      familyName: family.name,
+      familyId: family.id,
+      yearOfBirth: member.year_of_birth,
+      livingPlace: member.living_place,
+      occupation: member.occupation,
+      isDeceased: member.is_deceased
+    }))
   );
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Dashboard Title */}
-      <h1 className="text-4xl font-bold mb-2">My Dashboard</h1>
+  // Get all members from families where user is admin
+  const adminFamilyMembers = accessibleFamilies
+    .filter(family => 
+      family.created_by === userId || 
+      family.admins?.some(admin => admin.user_id === userId) ||
+      accessRequests.some(access => 
+        access.familyId === family.id && 
+        access.accessLevel === "admin" && 
+        access.status === "approved"
+      )
+    )
+    .flatMap(family => 
+      (family.members || []).map(member => ({
+        ...member,
+        name: member.full_name,
+        familyName: family.name,
+        familyId: family.id,
+        yearOfBirth: member.year_of_birth,
+        livingPlace: member.living_place,
+        occupation: member.occupation,
+        isDeceased: member.is_deceased
+      }))
+    );
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-2 mb-4 max-w-md">
-        <div className="relative w-full">
-          <Input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        </div>
-      </div>
+  // Filter members based on selected family and search query
+  const filteredMembers = (activeTab === "admin" ? adminFamilyMembers : allFamilyMembers)
+    .filter(member => {
+      const matchesSearch = 
+        (member.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (member.livingPlace?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (member.occupation?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (member.familyName?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Family Trees */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-medium">Family Trees</CardTitle>
-            {stats[0].icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats[0].value}</div>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="success">{stats[0].approved} Approved</Badge>
-              <Badge variant="warning">{stats[0].pending} Pending</Badge>
-            </div>
-          </CardContent>
-        </Card>
-        {/* Members Added */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-medium">Members Added</CardTitle>
-            {stats[1].icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats[1].value}</div>
-            <div className="w-full bg-muted h-2 rounded mt-2">
-              <div className="bg-primary h-2 rounded" style={{ width: `${stats[1].approvalRate}%` }} />
-            </div>
-            <span className="text-xs text-muted-foreground">{stats[1].approvalRate}% Approval Rate</span>
-          </CardContent>
-        </Card>
-        {/* Approved Members */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-medium">Approved Members</CardTitle>
-            {stats[2].icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats[2].value}</div>
-            <Badge variant="success" className="mt-2 inline-block">+{stats[2].recent} Recent</Badge>
-          </CardContent>
-        </Card>
-        {/* Pending Members */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-medium">Pending Members</CardTitle>
-            {stats[3].icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats[3].value}</div>
-            <Badge variant="destructive" className="mt-2 inline-block">{stats[3].recentRejections} Recent Rejections</Badge>
-          </CardContent>
-        </Card>
-      </div>
+      if (selectedFamily) {
+        return matchesSearch && member.familyId === selectedFamily;
+      }
+      return matchesSearch;
+    });
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-2">
-        {TABS.map((tab, idx) => (
-          <button
-            key={tab.label}
-            className={`px-4 py-2 rounded font-medium text-sm transition-colors ${activeTab === idx ? "bg-secondary text-primary" : "bg-muted text-muted-foreground"}`}
-            onClick={() => setActiveTab(idx)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* My Family Trees Table (only for My Families tab) */}
-      {activeTab === 0 && (
-        <div>
-          <h2 className="text-2xl font-semibold mb-1">My Family Trees</h2>
-          <p className="text-muted-foreground mb-4">View and manage your accessible family trees</p>
-          <div className="overflow-x-auto rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Family Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Access Level</TableHead>
-                  <TableHead>Members Added</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMyFamilies.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">No family trees to display.</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMyFamilies.map((fam, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{fam.name}</TableCell>
-                      <TableCell>{fam.description}</TableCell>
-                      <TableCell><Badge variant="secondary">{fam.accessLevel}</Badge></TableCell>
-                      <TableCell>{fam.membersAdded}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="secondary">View Tree</Button>
-                          <Button size="sm" variant="outline" className="flex items-center gap-1"><User2 className="h-4 w-4" /> Add Member</Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "my-families":
+        return (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {accessibleFamilies.map((family) => (
+              <Card 
+                key={family.id} 
+                className={`p-6 cursor-pointer transition-all ${
+                  selectedFamily === family.id ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setSelectedFamily(selectedFamily === family.id ? null : family.id)}
+              >
+                <h3 className="text-lg font-semibold mb-2">{family.name}</h3>
+                <p className="text-muted-foreground text-sm mb-4">{family.description}</p>
+                {(family.created_by === userId || family.admins?.some(admin => admin.user_id === userId)) && (
+                  <Badge variant="secondary" className="mb-4">admin</Badge>
                 )}
-              </TableBody>
-            </Table>
+              </Card>
+            ))}
           </div>
-        </div>
-      )}
+        )
 
-      {/* Access Requests Tab */}
-      {activeTab === 1 && (
-        <div>
-          <h2 className="text-2xl font-semibold mb-1">Access Requests</h2>
-          <p className="text-muted-foreground mb-4">View your recent access requests</p>
-          <div className="overflow-x-auto rounded-md border bg-card">
+      case "access-requests":
+        return (
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Family Name</TableHead>
+                  <TableHead>Requested By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Requested At</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAccessRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">No access requests to display.</TableCell>
+                {accessRequests.length === 0 ? (
+                  <TableRow key="no-requests">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No access requests
+                    </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAccessRequests.map((req, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{req.family}</TableCell>
+                  accessRequests.map((request) => (
+                    <TableRow key={`request-${request.id}`}>
+                      <TableCell>{request.family.name}</TableCell>
+                      <TableCell>{request.requestedBy}</TableCell>
                       <TableCell>
-                        <Badge variant={req.statusColor === 'green' ? 'success' : req.statusColor === 'yellow' ? 'warning' : req.statusColor === 'red' ? 'destructive' : 'secondary'}>
-                          {req.status}
+                        <Badge variant={request.status === 'PENDING' ? 'warning' : request.status === 'APPROVED' ? 'success' : 'destructive'}>
+                          {request.status.toLowerCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell>{req.date}</TableCell>
+                      <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        {request.status === 'PENDING' && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600">
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
           </div>
-        </div>
-      )}
+        )
 
-      {/* My Members Tab */}
-      {activeTab === 2 && (
-        <div>
-          <h2 className="text-2xl font-semibold mb-1">My Members</h2>
-          <p className="text-muted-foreground mb-4">View members you have added</p>
-          <div className="overflow-x-auto rounded-md border bg-card">
+      case "my-members":
+      case "admin":
+        return (
+          <>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-4">
+                <div className="relative w-[240px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search members..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <select 
+                  className="px-3 py-2 rounded-md border bg-background"
+                  value={selectedFamily || ''}
+                  onChange={(e) => setSelectedFamily(e.target.value || null)}
+                >
+                  <option value="">All Families</option>
+                  {accessibleFamilies
+                    .filter(family => activeTab !== "admin" || family.created_by === userId || family.admins?.some(admin => admin.user_id === userId))
+                    .map(family => (
+                      <option key={`family-${family.id}`} value={family.id}>
+                        {family.name}
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+              <Button className="bg-green-600 hover:bg-green-700 text-white">
+                <User2 className="h-4 w-4 mr-2" />
+                Add Member
+              </Button>
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Member Name</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Family</TableHead>
+                  <TableHead>Year of Birth</TableHead>
+                  <TableHead>Living Place</TableHead>
+                  <TableHead>Occupation</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Date Added</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMyMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">No members to display.</TableCell>
+                {filteredMembers.length === 0 ? (
+                  <TableRow key="no-members">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      No members found
+                    </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMyMembers.map((mem, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{mem.name}</TableCell>
-                      <TableCell>{mem.family}</TableCell>
+                  filteredMembers.map((member) => (
+                    <TableRow key={`member-${member.id}-${member.familyId}`}>
+                      <TableCell>{member.name}</TableCell>
+                      <TableCell>{member.familyName}</TableCell>
+                      <TableCell>{member.yearOfBirth}</TableCell>
+                      <TableCell>{member.livingPlace}</TableCell>
+                      <TableCell>{member.occupation || "N/A"}</TableCell>
                       <TableCell>
-                        <Badge variant={mem.statusColor === 'green' ? 'success' : mem.statusColor === 'yellow' ? 'warning' : mem.statusColor === 'red' ? 'destructive' : 'secondary'}>
-                          {mem.status}
+                        <Badge 
+                          variant={member.isDeceased ? "destructive" : "success"}
+                          className={member.isDeceased ? "" : "bg-green-600"}
+                        >
+                          {member.isDeceased ? "Deceased" : "Living"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{mem.date}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-          </div>
-        </div>
-      )}
+          </>
+        )
 
-      {/* Approval History Tab */}
-      {activeTab === 3 && (
-        <div>
-          <h2 className="text-2xl font-semibold mb-1">Approval History</h2>
-          <p className="text-muted-foreground mb-4">See your member approval history</p>
-          <div className="overflow-x-auto rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member Name</TableHead>
-                  <TableHead>Family</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredApprovalHistory.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">No approval history to display.</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredApprovalHistory.map((hist, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{hist.name}</TableCell>
-                      <TableCell>{hist.family}</TableCell>
-                      <TableCell>
-                        <Badge variant={hist.statusColor === 'green' ? 'success' : hist.statusColor === 'yellow' ? 'warning' : hist.statusColor === 'red' ? 'destructive' : 'secondary'}>
-                          {hist.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{hist.date}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
+      case "approval-history":
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Family Name</TableHead>
+                <TableHead>Member Name</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Approved By</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow key="no-history">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  No approval history
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="mt-[6px] animate-fade-in">
+      {/* Tab Navigation */}
+      <div className="bg-gray-100 rounded-lg p-1">
+        <nav className="flex gap-1">
+          <button
+            className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
+              activeTab === "my-families"
+                ? "bg-white shadow-sm"
+                : "hover:bg-gray-50"
+            }`}
+            onClick={() => setActiveTab("my-families")}
+          >
+            My Families
+          </button>
+          <button
+            className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
+              activeTab === "access-requests"
+                ? "bg-white shadow-sm"
+                : "hover:bg-gray-50"
+            }`}
+            onClick={() => setActiveTab("access-requests")}
+          >
+            Access Requests
+          </button>
+          <button
+            className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
+              activeTab === "my-members"
+                ? "bg-white shadow-sm"
+                : "hover:bg-gray-50"
+            }`}
+            onClick={() => setActiveTab("my-members")}
+          >
+            My Members
+          </button>
+          <button
+            className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
+              activeTab === "approval-history"
+                ? "bg-white shadow-sm"
+                : "hover:bg-gray-50"
+            }`}
+            onClick={() => setActiveTab("approval-history")}
+          >
+            Approval History
+          </button>
+          {isAdminInAnyFamily && (
+            <button
+              className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
+                activeTab === "admin"
+                  ? "bg-white shadow-sm"
+                  : "hover:bg-gray-50"
+              }`}
+              onClick={() => setActiveTab("admin")}
+            >
+              Admin
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {/* Content Area */}
+      <div className="mt-6">
+        {renderTabContent()}
+      </div>
     </div>
   )
 }
