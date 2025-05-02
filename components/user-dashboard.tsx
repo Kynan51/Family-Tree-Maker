@@ -4,11 +4,14 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { User2, Pencil, Trash, Check, X } from "lucide-react"
-import type { Family, FamilyAccess } from "@/lib/types"
+import type { Family, FamilyAccess, FamilyMember } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { EditFamilyMemberDialog } from "@/components/edit-family-member-dialog"
+import { DeleteFamilyMemberDialog } from "@/components/delete-family-member-dialog"
+import { PrivacyToggle } from "@/components/privacy-toggle"
 
 interface UserDashboardProps {
   userId: string
@@ -20,6 +23,22 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("my-families")
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null)
+  const [memberToEdit, setMemberToEdit] = useState<FamilyMember | null>(null)
+  const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null)
+  const [membersState, setMembersState] = useState<FamilyMember[]>(() => 
+    accessibleFamilies.flatMap(family => 
+      (family.members || []).map(member => ({
+        ...member,
+        name: member.full_name,
+        familyName: family.name,
+        familyId: family.id,
+        yearOfBirth: member.year_of_birth,
+        livingPlace: member.living_place,
+        occupation: member.occupation,
+        isDeceased: member.is_deceased
+      }))
+    )
+  )
 
   // Check if user is admin in any family
   const isAdminInAnyFamily = accessibleFamilies.some(family => {
@@ -87,6 +106,14 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
       return matchesSearch;
     });
 
+  const handleUpdateMember = (updatedMember: FamilyMember) => {
+    setMembersState(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m))
+  }
+
+  const handleDeleteMember = (id: string) => {
+    setMembersState(prev => prev.filter(m => m.id !== id))
+  }
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "my-families":
@@ -98,7 +125,10 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                 className={`p-6 cursor-pointer transition-all ${
                   selectedFamily === family.id ? 'ring-2 ring-primary' : ''
                 }`}
-                onClick={() => setSelectedFamily(selectedFamily === family.id ? null : family.id)}
+                onClick={() => {
+                  setSelectedFamily(family.id);
+                  setActiveTab("my-members");
+                }}
               >
                 <h3 className="text-lg font-semibold mb-2">{family.name}</h3>
                 <p className="text-muted-foreground text-sm mb-4">{family.description}</p>
@@ -165,7 +195,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
       case "admin":
         return (
           <>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col gap-4 mb-6">
               <div className="flex items-center gap-4">
                 <div className="relative w-[240px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -184,7 +214,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                 >
                   <option value="">All Families</option>
                   {accessibleFamilies
-                    .filter(family => activeTab !== "admin" || family.created_by === userId || family.admins?.some(admin => admin.user_id === userId))
+                    .filter(family => family.created_by === userId || family.admins?.some(admin => admin.user_id === userId))
                     .map(family => (
                       <option key={`family-${family.id}`} value={family.id}>
                         {family.name}
@@ -193,6 +223,26 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                   }
                 </select>
               </div>
+              
+              {selectedFamily && (
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Privacy Settings:</span>
+                    <PrivacyToggle 
+                      familyId={selectedFamily} 
+                      initialIsPublic={accessibleFamilies.find(f => f.id === selectedFamily)?.is_public || false} 
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {!accessibleFamilies.find(f => f.id === selectedFamily)?.is_public 
+                      ? "Only approved members can view this family tree"
+                      : "Anyone can view this family tree"}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end mb-4">
               <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <User2 className="h-4 w-4 mr-2" />
                 Add Member
@@ -235,10 +285,20 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => setMemberToEdit(member)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => setMemberToDelete(member)}
+                        >
                           <Trash className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -341,6 +401,26 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
       <div className="mt-6">
         {renderTabContent()}
       </div>
+
+      {/* Add dialogs at the end of the component */}
+      {memberToEdit && (
+        <EditFamilyMemberDialog
+          open={true}
+          onOpenChange={() => setMemberToEdit(null)}
+          member={memberToEdit}
+          existingMembers={allFamilyMembers}
+          onUpdate={handleUpdateMember}
+        />
+      )}
+
+      {memberToDelete && (
+        <DeleteFamilyMemberDialog
+          open={true}
+          onOpenChange={() => setMemberToDelete(null)}
+          member={memberToDelete}
+          onDelete={handleDeleteMember}
+        />
+      )}
     </div>
   )
 }

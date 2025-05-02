@@ -615,19 +615,32 @@ export function ExportButton({ familyId }: ExportButtonProps) {
         
         img.onload = () => {
           try {
+            // Create a canvas with higher resolution
+            const scale = 2; // Increase resolution by 2x
             const canvas = document.createElement('canvas')
-            canvas.width = img.width
-            canvas.height = img.height
+            canvas.width = img.width * scale
+            canvas.height = img.height * scale
             const ctx = canvas.getContext('2d')
             if (!ctx) {
               throw new Error('Could not get canvas context')
             }
             
+            // Set white background
             ctx.fillStyle = 'white'
             ctx.fillRect(0, 0, canvas.width, canvas.height)
+            
+            // Enable image smoothing
+            ctx.imageSmoothingEnabled = true
+            ctx.imageSmoothingQuality = 'high'
+            
+            // Scale the context to match the canvas size
+            ctx.scale(scale, scale)
+            
+            // Draw the image
             ctx.drawImage(img, 0, 0)
             
-            const pngUrl = canvas.toDataURL('image/png')
+            // Convert to PNG with high quality
+            const pngUrl = canvas.toDataURL('image/png', 1.0)
             const link = document.createElement("a")
             link.href = pngUrl
             link.download = `family-tree-${currentFamilyId}.png`
@@ -654,8 +667,8 @@ export function ExportButton({ familyId }: ExportButtonProps) {
           }
         }
         
-        img.onerror = () => {
-          console.error("Error loading SVG for PNG conversion")
+        img.onerror = (error) => {
+          console.error("Error loading SVG for PNG conversion:", error)
           toast({
             title: "Export Failed",
             description: "Failed to load SVG for PNG conversion",
@@ -665,6 +678,8 @@ export function ExportButton({ familyId }: ExportButtonProps) {
           URL.revokeObjectURL(url)
         }
         
+        // Set crossOrigin to anonymous to avoid CORS issues
+        img.crossOrigin = "anonymous"
         img.src = url
       }
     } catch (error) {

@@ -59,6 +59,7 @@ export async function GET(request: Request) {
         relationships:relationships!member_id(
           type,
           related_member:family_members!related_member_id(
+            id,
             full_name
           )
         )
@@ -115,21 +116,31 @@ export async function GET(request: Request) {
     const processedMembers = familyMembers.map(member => {
       // Group relationships by type
       const relationships = member.relationships || []
-      const parents = relationships
-        .filter(r => r.type === 'parent')
-        .map(r => r.related_member?.full_name)
+      
+      // For parents, we need to find members who have this member as their child
+      const parents = familyMembers
+        .filter(m => m.relationships?.some((r: { type: string; related_member: { id: string } }) => 
+          r.type === 'parent' && 
+          r.related_member?.id === member.id
+        ))
+        .map(m => m.full_name)
         .filter(Boolean)
         .join(", ")
       
+      // For spouses, we look for spouse relationships
       const spouses = relationships
-        .filter(r => r.type === 'spouse')
-        .map(r => r.related_member?.full_name)
+        .filter((r: { type: string; related_member: { full_name: string } }) => r.type === 'spouse')
+        .map((r: { type: string; related_member: { full_name: string } }) => r.related_member?.full_name)
         .filter(Boolean)
         .join(", ")
       
-      const children = relationships
-        .filter(r => r.type === 'child')
-        .map(r => r.related_member?.full_name)
+      // For children, we need to find members who have this member as their parent
+      const children = familyMembers
+        .filter(m => m.relationships?.some((r: { type: string; related_member: { id: string } }) => 
+          r.type === 'child' && 
+          r.related_member?.id === member.id
+        ))
+        .map(m => m.full_name)
         .filter(Boolean)
         .join(", ")
 

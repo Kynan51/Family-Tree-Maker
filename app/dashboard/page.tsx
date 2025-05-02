@@ -24,7 +24,21 @@ export default async function DashboardPage() {
       return <div>Error loading dashboard</div>
     }
 
-    return <AdminDashboard familyMembers={familyMembers} />
+    // Get the first family's ID and privacy status
+    const { data: family } = await adminClient
+      .from("families")
+      .select("id, is_public")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+
+    return (
+      <AdminDashboard 
+        familyMembers={familyMembers} 
+        familyId={family?.id}
+        isPublic={family?.is_public}
+      />
+    )
   }
 
   // Handle regular user view
@@ -57,7 +71,7 @@ export default async function DashboardPage() {
       id: f.id,
       name: f.name,
       created_by: f.created_by,
-      admins: f.admins?.map(a => a.user_id) || []
+      admins: f.admins?.map((a: { user_id: string }) => a.user_id) || []
     })),
     userFamilyAccess: userFamilyAccess?.map(a => ({
       familyId: a.family_id,
@@ -76,7 +90,6 @@ export default async function DashboardPage() {
       userId={session.user.id}
       accessibleFamilies={accessibleFamilies || []}
       accessRequests={accessRequests || []}
-      userFamilyAccess={userFamilyAccess || []}
     />
   )
 }

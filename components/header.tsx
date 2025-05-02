@@ -83,16 +83,17 @@ export function Header() {
           {/* Desktop nav: always show all tabs, disable if not allowed */}
           <nav className="hidden md:flex gap-6">
             {navLinks.map((link) => {
-              const isDisabled = (link.admin && !isAdmin) || (link.superAdmin && !isSuperAdmin);
+              // Skip rendering links that user doesn't have access to
+              if ((link.admin && !isAdmin) || (link.superAdmin && !isSuperAdmin)) {
+                return null;
+              }
               return (
                 <Link
                   key={link.href}
-                  href={isDisabled ? "#" : link.href}
+                  href={link.href}
                   className={`text-sm font-medium transition-colors ${
                     pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                  } ${isDisabled ? "opacity-50 pointer-events-none" : ""}`}
-                  tabIndex={isDisabled ? -1 : 0}
-                  aria-disabled={isDisabled}
+                  }`}
                 >
                   {link.icon}
                   {link.label}
@@ -210,19 +211,25 @@ export function Header() {
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
           <nav className="flex flex-col gap-4 p-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`text-base font-medium transition-colors ${
-                  pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setDrawerOpen(false)}
-              >
-                {link.icon}
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              // Skip rendering links that user doesn't have access to
+              if ((link.admin && !isAdmin) || (link.superAdmin && !isSuperAdmin)) {
+                return null;
+              }
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-base font-medium transition-colors ${
+                    pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setDrawerOpen(false)}
+                >
+                  {link.icon}
+                  {link.label}
+                </Link>
+              );
+            })}
             <hr className="my-2" />
             <Button
               variant="ghost"

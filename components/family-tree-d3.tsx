@@ -10,6 +10,8 @@ import { toast } from "@/components/ui/use-toast"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
 import { Tree, TreeNodeDatum, Point } from 'react-d3-tree'
 import { FamilyMember as LibFamilyMember } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import { User2 } from "lucide-react"
 
 // Add this interface at the top of the file
 interface WindowWithFamilyId extends Window {
@@ -49,7 +51,10 @@ function Tooltip({ person }: { person: any }) {
 }
 
 // Dynamically import react-d3-tree to avoid SSR issues
-const TreeComponent = dynamic(() => import("react-d3-tree").then(mod => mod.Tree), { ssr: false })
+const TreeComponent = dynamic(() => import("react-d3-tree").then(mod => mod.Tree), { 
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-[500px]">Loading family tree...</div>
+})
 
 interface FamilyMember extends LibFamilyMember {
   generation: number
@@ -224,16 +229,10 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
           <span className="text-xs text-muted-foreground truncate w-full text-center" title={nodeDatum.attributes.relation}>{nodeDatum.attributes.relation}</span>
         </div>
         {isAdmin && (
-          <button
-            className="w-full px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded flex items-center justify-center gap-1 shadow transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-              onAdd(nodeDatum)
-            }}
-          >
-            <svg width="8" height="8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <Button className="bg-green-600 hover:bg-green-700 text-white w-full" onClick={(e) => { e.stopPropagation(); onAdd(nodeDatum); }}>
+            <User2 className="h-4 w-4 mr-2" />
             Add
-          </button>
+          </Button>
         )}
       </Card>
     </div>
@@ -314,24 +313,27 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       </foreignObject>
       {showTooltip && tooltipData && ReactDOM.createPortal(
         <div
-          className="fixed z-50 bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 text-sm"
+          className="fixed z-[9999] bg-card border border-border shadow-lg rounded-lg p-3 text-sm"
           style={{
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             transform: 'translateY(-100%)',
             minWidth: '200px',
-            maxWidth: '300px'
+            maxWidth: '300px',
+            pointerEvents: 'none'
           }}
         >
-          <div className="font-medium text-gray-900 dark:text-white">{tooltipData.name}</div>
-          <div className="text-gray-500 dark:text-gray-300">Born: {tooltipData.yearOfBirth}</div>
-          <div className="text-gray-500 dark:text-gray-300">Location: {tooltipData.livingPlace}</div>
+          <div className="font-medium text-card-foreground text-sm">{tooltipData.name}</div>
+          <div className="text-muted-foreground text-xs">Born: {tooltipData.yearOfBirth}</div>
+          <div className="text-muted-foreground text-xs">Location: {tooltipData.livingPlace}</div>
           {tooltipData.occupation && (
-            <div className="text-gray-500 dark:text-gray-300">Occupation: {tooltipData.occupation}</div>
+            <div className="text-muted-foreground text-xs">Occupation: {tooltipData.occupation}</div>
           )}
-          <div className="text-gray-500 dark:text-gray-300">Status: {tooltipData.isDeceased}</div>
+          <div className="text-muted-foreground text-xs">
+            Status: {tooltipData.isDeceased === 'Deceased' || tooltipData.isDeceased === true ? <span className="text-red-500">Deceased</span> : tooltipData.isDeceased}
+          </div>
           {tooltipData.relation && (
-            <div className="text-gray-500 dark:text-gray-300">Marital Status: {tooltipData.relation}</div>
+            <div className="text-muted-foreground text-xs">Marital Status: {tooltipData.relation}</div>
           )}
         </div>,
         document.body
@@ -583,14 +585,10 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
           ))}
           {/* Add member button for admins */}
           {isAdmin && (
-            <button
-              className="ml-2 px-3 py-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded flex items-center gap-1 shadow"
-              style={{ pointerEvents: 'auto', height: 36, alignSelf: 'center' }}
-              onClick={() => { if (main) setSelectedMember(main); setShowAddDialog(true); }}
-            >
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <Button className="bg-green-600 hover:bg-green-700 text-white w-full" style={{ pointerEvents: 'auto', height: 36, alignSelf: 'center' }} onClick={() => { if (main) setSelectedMember(main); setShowAddDialog(true); }}>
+              <User2 className="h-4 w-4 mr-2" />
               Add Member
-            </button>
+            </Button>
           )}
         </div>
       )
@@ -667,9 +665,9 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
   if (!membersState || membersState.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[500px]">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 w-full max-w-md">
-          <h2 className="text-2xl font-bold mb-4 text-center">Start Your Family Tree</h2>
-          <p className="mb-6 text-center text-gray-600 dark:text-gray-300">Add the first (oldest) person to begin your family tree.</p>
+        <div className="bg-background rounded-lg shadow-lg p-8 w-full max-w-md">
+          <h2 className="text-2xl font-bold mb-4 text-center text-foreground">Start Your Family Tree</h2>
+          <p className="mb-6 text-center text-muted-foreground">Add the first (oldest) person to begin your family tree.</p>
           <form onSubmit={e => {
             e.preventDefault();
             const newId = Math.random().toString(36).slice(2)
@@ -697,20 +695,45 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
             })
           }}>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Full Name</label>
-              <input name="fullName" required className="w-full border rounded px-3 py-2" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} />
+              <label className="block mb-1 font-medium text-foreground">Full Name</label>
+              <input 
+                name="fullName" 
+                required 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.fullName} 
+                onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} 
+              />
             </div>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Year of Birth</label>
-              <input name="yearOfBirth" type="number" required className="w-full border rounded px-3 py-2" value={form.yearOfBirth} onChange={e => setForm(f => ({ ...f, yearOfBirth: e.target.value }))} />
+              <label className="block mb-1 font-medium text-foreground">Year of Birth</label>
+              <input 
+                name="yearOfBirth" 
+                type="number" 
+                required 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.yearOfBirth} 
+                onChange={e => setForm(f => ({ ...f, yearOfBirth: e.target.value }))} 
+              />
             </div>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Living Place</label>
-              <input name="livingPlace" required className="w-full border rounded px-3 py-2" value={form.livingPlace} onChange={e => setForm(f => ({ ...f, livingPlace: e.target.value }))} />
+              <label className="block mb-1 font-medium text-foreground">Living Place</label>
+              <input 
+                name="livingPlace" 
+                required 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.livingPlace} 
+                onChange={e => setForm(f => ({ ...f, livingPlace: e.target.value }))} 
+              />
             </div>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Marital Status</label>
-              <select name="maritalStatus" required className="w-full border rounded px-3 py-2" value={form.maritalStatus} onChange={e => setForm(f => ({ ...f, maritalStatus: e.target.value }))}>
+              <label className="block mb-1 font-medium text-foreground">Marital Status</label>
+              <select 
+                name="maritalStatus" 
+                required 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.maritalStatus} 
+                onChange={e => setForm(f => ({ ...f, maritalStatus: e.target.value }))}
+              >
                 <option value="Single">Single</option>
                 <option value="Married">Married</option>
                 <option value="Divorced">Divorced</option>
@@ -718,17 +741,33 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
               </select>
             </div>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Occupation</label>
-              <input name="occupation" className="w-full border rounded px-3 py-2" value={form.occupation} onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} />
+              <label className="block mb-1 font-medium text-foreground">Occupation</label>
+              <input 
+                name="occupation" 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.occupation} 
+                onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} 
+              />
             </div>
             <div className="mb-3">
-              <label className="block mb-1 font-medium">Deceased?</label>
-              <select name="isDeceased" required className="w-full border rounded px-3 py-2" value={form.isDeceased} onChange={e => setForm(f => ({ ...f, isDeceased: e.target.value }))}>
+              <label className="block mb-1 font-medium text-foreground">Deceased?</label>
+              <select 
+                name="isDeceased" 
+                required 
+                className="w-full border rounded px-3 py-2 bg-background text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring" 
+                value={form.isDeceased} 
+                onChange={e => setForm(f => ({ ...f, isDeceased: e.target.value }))}
+              >
                 <option value="false">No</option>
                 <option value="true">Yes</option>
               </select>
             </div>
-            <button type="submit" className="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold">Add First Member</button>
+            <button 
+              type="submit" 
+              className="w-full bg-primary text-primary-foreground py-2 rounded hover:bg-primary/90 font-semibold transition-colors"
+            >
+              Add First Member
+            </button>
           </form>
         </div>
       </div>

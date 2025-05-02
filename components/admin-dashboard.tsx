@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Pencil, Trash2, Search, Settings, Clock } from "lucide-react"
+import { Plus, Pencil, Trash2, Search, Settings, Clock, Lock, Globe } from "lucide-react"
 import type { FamilyMember } from "@/lib/types"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
 import { EditFamilyMemberDialog } from "@/components/edit-family-member-dialog"
@@ -14,29 +14,26 @@ import { DeleteFamilyMemberDialog } from "@/components/delete-family-member-dial
 
 interface AdminDashboardProps {
   familyMembers: FamilyMember[]
+  familyId?: string
+  isPublic?: boolean
 }
 
-export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboardProps) {
+export function AdminDashboard({ familyMembers: initialMembers, familyId, isPublic = false }: AdminDashboardProps) {
   const router = useRouter()
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(initialMembers)
+  const [familyMembers, setFamilyMembers] = useState(initialMembers)
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [memberToEdit, setMemberToEdit] = useState<FamilyMember | null>(null)
   const [memberToDelete, setMemberToDelete] = useState<FamilyMember | null>(null)
+
   const filteredMembers = familyMembers.filter((member) =>
-    member.fullName?.toLowerCase().includes(searchQuery.toLowerCase()),
+    member.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleAddMember = (newMember: FamilyMember) => {
-    if (!newMember.fullName) {
-      console.error("Attempted to add member without fullName:", newMember);
-      return;
-    }
-    setFamilyMembers((prev) => [...prev, newMember])
-  }
-
   const handleUpdateMember = (updatedMember: FamilyMember) => {
-    setFamilyMembers((prev) => prev.map((member) => (member.id === updatedMember.id ? updatedMember : member)))
+    setFamilyMembers((prev) =>
+      prev.map((member) => (member.id === updatedMember.id ? updatedMember : member))
+    )
   }
 
   const handleDeleteMember = (id: string) => {
@@ -75,14 +72,26 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50 dark:bg-blue-900/20 cursor-pointer" onClick={() => router.push("/admin/settings")}>
+        <Card className="bg-blue-50 dark:bg-blue-900/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Settings</CardTitle>
-            <Settings className="h-4 w-4 text-blue-700 dark:text-blue-500" />
+            <CardTitle className="text-sm font-medium">Privacy Settings</CardTitle>
+            {!isPublic ? (
+              <Lock className="h-4 w-4 text-blue-700 dark:text-blue-500" />
+            ) : (
+              <Globe className="h-4 w-4 text-blue-700 dark:text-blue-500" />
+            )}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Configure</div>
-            <p className="text-xs text-muted-foreground">Manage application settings</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold">{!isPublic ? "Private" : "Public"}</div>
+                <p className="text-xs text-muted-foreground">
+                  {!isPublic
+                    ? "Only approved members can view this family tree"
+                    : "Anyone can view this family tree"}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -107,77 +116,78 @@ export function AdminDashboard({ familyMembers: initialMembers }: AdminDashboard
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Birth Year</TableHead>
+                  <TableHead>Year of Birth</TableHead>
                   <TableHead>Living Place</TableHead>
+                  <TableHead>Occupation</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Marital Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
-                      No family members found
+                {filteredMembers.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell>{member.name}</TableCell>
+                    <TableCell>{member.yearOfBirth}</TableCell>
+                    <TableCell>{member.livingPlace}</TableCell>
+                    <TableCell>{member.occupation || "N/A"}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          member.isDeceased
+                            ? "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                            : "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                        }`}
+                      >
+                        {member.isDeceased ? "Deceased" : "Living"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setMemberToEdit(member)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setMemberToDelete(member)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell className="font-medium">{member.fullName}</TableCell>
-                      <TableCell>{member.yearOfBirth}</TableCell>
-                      <TableCell>{member.livingPlace}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs ${
-                            member.isDeceased
-                              ? "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-                              : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                          }`}
-                        >
-                          {member.isDeceased ? "Deceased" : "Alive"}
-                        </span>
-                      </TableCell>
-                      <TableCell>{member.maritalStatus}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => setMemberToEdit(member)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setMemberToDelete(member)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
       {showAddDialog && (
         <AddFamilyMemberDialog
           open={showAddDialog}
           onOpenChange={setShowAddDialog}
-          existingMembers={familyMembers}
-          onAdd={handleAddMember}
-          familyId={familyMembers[0]?.familyId || ""}
+          onAdd={(newMember) => {
+            setFamilyMembers((prev) => [...prev, newMember])
+            setShowAddDialog(false)
+          }}
         />
       )}
 
       {memberToEdit && (
         <EditFamilyMemberDialog
-          open={!!memberToEdit}
+          open={true}
           onOpenChange={() => setMemberToEdit(null)}
           member={memberToEdit}
-          existingMembers={familyMembers}
           onUpdate={handleUpdateMember}
         />
       )}
 
       {memberToDelete && (
         <DeleteFamilyMemberDialog
-          open={!!memberToDelete}
+          open={true}
           onOpenChange={() => setMemberToDelete(null)}
           member={memberToDelete}
           onDelete={handleDeleteMember}

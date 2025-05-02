@@ -35,6 +35,19 @@ export default async function TreePage() {
   // You may need to adjust this to match your actual code
   const currentFamilyId = familyIds[0]; // Replace with actual logic to get the current familyId
 
+  // Fetch the family name for the currentFamilyId
+  let familyName = "Family Tree";
+  if (currentFamilyId) {
+    const { data: family, error: familyError } = await supabase
+      .from("families")
+      .select("name")
+      .eq("id", currentFamilyId)
+      .single();
+    if (family && family.name) {
+      familyName = family.name;
+    }
+  }
+
   // Check if user is admin for the current family
   const { data: adminAccess } = await supabase
     .from("user_family_access")
@@ -58,7 +71,7 @@ export default async function TreePage() {
 
     return (
       <div className="container mx-auto py-6">
-        <h1 className="text-3xl font-bold mb-6">Family Tree</h1>
+        <h1 className="text-3xl font-bold mb-6">{familyName}</h1>
         <FamilyTreeView familyMembers={members} isAdmin={isAdmin} />
       </div>
     )
@@ -142,7 +155,7 @@ export default async function TreePage() {
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Family Tree</h1>
+      <h1 className="text-3xl font-bold mb-6">{familyName}</h1>
       <FamilyTreeView familyMembers={transformedMembers} isAdmin={isAdmin} />
     </div>
   )

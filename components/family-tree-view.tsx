@@ -3,12 +3,16 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut } from "lucide-react"
+import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2 } from "lucide-react"
 import type { FamilyMember } from "@/lib/types"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
 import { FamilyTreeD3 } from "@/components/family-tree-d3"
 import { TimelineChart } from "@/components/timeline-chart"
 import { ExportButton } from "@/components/export-button"
+import { ShareButton } from "@/components/share-button"
+import * as XLSX from "xlsx"
+import { createFamilyMember, updateFamilyMember } from "@/lib/actions"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 interface FamilyTreeViewProps {
   familyMembers: FamilyMember[]
@@ -20,8 +24,32 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
   // console.log("familyMembers prop:", familyMembers);
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
+  const [isMaximized, setIsMaximized] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importSuccess, setImportSuccess] = useState<string | null>(null)
+  // Default required columns match export logic
+  const defaultColumns = [
+    "full_name",
+    "year_of_birth",
+    "living_place",
+    "is_deceased",
+    "marital_status",
+    "occupation",
+    "parents",
+    "spouses",
+    "children"
+  ]
+  // Also allow minimal import format
+  const minimalColumns = [
+    "full_name",
+    "year_of_birth",
+    "living_place",
+    "is_deceased",
+    "marital_status",
+    "occupation"
+  ]
 
   // Log the family ID for debugging
   useEffect(() => {
@@ -36,43 +64,287 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
     setZoom((prev) => Math.max(prev - 0.1, 0.5))
   }
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null)
+    setImportSuccess(null)
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async (evt) => {
+      const data = evt.target?.result
+      if (!data) return
+      const workbook = XLSX.read(data, { type: "binary" })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      const headers = json[0] as string[]
+      // Accept if file has all defaultColumns or all minimalColumns
+      const hasDefault = defaultColumns.every(col => headers.includes(col))
+      const hasMinimal = minimalColumns.every(col => headers.includes(col))
+      if (!hasDefault && !hasMinimal) {
+        setImportError(
+          `Invalid file format.\n\nRequired columns (default): ${defaultColumns.join(", ")}\nOR\nMinimal columns: ${minimalColumns.join(", ")}\n\nYour file columns: ${headers.join(", ")}`
+        )
+        return
+      }
+      // Map rows to FamilyMember objects and insert (first pass)
+      const rows = json.slice(1)
+      let successCount = 0
+      let failCount = 0
+      const nameToId: Record<string, string> = {}
+      const importedMembers: any[] = []
+      for (const row of rows) {
+        try {
+          const rowObj = Object.fromEntries(headers.map((h, i) => [h, row[i]]))
+          // Accept various is_deceased values
+          let isDeceased = false
+          if (typeof rowObj.is_deceased === 'string') {
+            const val = rowObj.is_deceased.trim().toLowerCase()
+            isDeceased = val === 'yes' || val === 'true' || val === '1'
+          } else if (typeof rowObj.is_deceased === 'number') {
+            isDeceased = rowObj.is_deceased === 1
+          } else if (typeof rowObj.is_deceased === 'boolean') {
+            isDeceased = rowObj.is_deceased
+          }
+          // Check if member exists in DB (primary match)
+          const supabase = createAdminClient()
+          let { data: existing, error: findError } = await supabase
+            .from('family_members')
+            .select('id')
+            .eq('full_name', rowObj.full_name)
+            .eq('year_of_birth', Number(rowObj.year_of_birth))
+            .eq('living_place', rowObj.living_place)
+            .eq('family_id', familyId)
+            .maybeSingle()
+          let id = existing?.id
+          // If not found, try to match by year_of_birth and relationships
+          if (!id) {
+            const yearOfBirth = Number(rowObj.year_of_birth)
+            const relTypes = ["parents", "spouses", "children"]
+            let possibleIds: string[] = []
+            for (const relType of relTypes) {
+              const relNames = (typeof rowObj[relType] === 'string') ? rowObj[relType].split(',').map((n: string) => n.trim()).filter(Boolean) : []
+              for (const relName of relNames) {
+                // Find related member by name in the same family
+                const { data: relatedMembers, error: relError } = await supabase
+                  .from('family_members')
+                  .select('id')
+                  .eq('full_name', relName)
+                  .eq('family_id', familyId)
+                if (relatedMembers && relatedMembers.length > 0) {
+                  for (const related of relatedMembers) {
+                    // Find relationships where related_member_id = related.id and year_of_birth matches
+                    const { data: rels, error: relsError } = await supabase
+                      .from('relationships')
+                      .select('member_id')
+                      .eq('related_member_id', related.id)
+                      .eq('type', relType.slice(0, -1)) // parent/child/spouse
+                    if (rels && rels.length > 0) {
+                      for (const rel of rels) {
+                        // Get the member's year_of_birth
+                        const { data: m, error: mErr } = await supabase
+                          .from('family_members')
+                          .select('id,year_of_birth')
+                          .eq('id', rel.member_id)
+                          .eq('year_of_birth', yearOfBirth)
+                          .maybeSingle()
+                        if (m && m.id) possibleIds.push(m.id)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            // If exactly one possible match, use it
+            if (possibleIds.length === 1) {
+              id = possibleIds[0]
+            }
+          }
+          if (!id) id = crypto.randomUUID()
+          const member = {
+            id,
+            name: rowObj.full_name,
+            fullName: rowObj.full_name,
+            yearOfBirth: Number(rowObj.year_of_birth),
+            livingPlace: rowObj.living_place,
+            isDeceased,
+            maritalStatus: rowObj.marital_status,
+            photoUrl: rowObj.photo_url || null,
+            relationships: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            familyId: familyId,
+            occupation: rowObj.occupation || '',
+          }
+          if (existing?.id || (id && id !== member.id)) {
+            await updateFamilyMember(member)
+          } else if (!existing?.id && id === member.id) {
+            await createFamilyMember(member)
+          }
+          nameToId[rowObj.full_name] = id
+          importedMembers.push({ ...member, _rowObj: rowObj })
+          successCount++
+        } catch (err) {
+          failCount++
+        }
+      }
+      // Second pass: create relationships
+      try {
+        const supabase = createAdminClient()
+        for (const member of importedMembers) {
+          const { _rowObj, id: memberId } = member
+          // Helper to parse names from a column
+          const parseNames = (val: any) =>
+            typeof val === 'string' ? val.split(',').map((n: string) => n.trim()).filter(Boolean) : []
+          // Helper to get memberId by name (from import or DB)
+          const getMemberIdByName = async (name: string) => {
+            if (nameToId[name]) return nameToId[name]
+            // Query DB for member with this name in the same family
+            const { data, error } = await supabase
+              .from('family_members')
+              .select('id')
+              .eq('full_name', name)
+              .eq('family_id', familyId)
+              .maybeSingle()
+            if (data && data.id) return data.id
+            return null
+          }
+          // Parents
+          for (const parentName of parseNames(_rowObj.parents)) {
+            const parentId = await getMemberIdByName(parentName)
+            if (parentId) {
+              await supabase.from('relationships').upsert([
+                { member_id: memberId, related_member_id: parentId, type: 'parent' },
+                { member_id: parentId, related_member_id: memberId, type: 'child' }
+              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
+            }
+          }
+          // Spouses
+          for (const spouseName of parseNames(_rowObj.spouses)) {
+            const spouseId = await getMemberIdByName(spouseName)
+            if (spouseId) {
+              await supabase.from('relationships').upsert([
+                { member_id: memberId, related_member_id: spouseId, type: 'spouse' },
+                { member_id: spouseId, related_member_id: memberId, type: 'spouse' }
+              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
+            }
+          }
+          // Children
+          for (const childName of parseNames(_rowObj.children)) {
+            const childId = await getMemberIdByName(childName)
+            if (childId) {
+              await supabase.from('relationships').upsert([
+                { member_id: memberId, related_member_id: childId, type: 'child' },
+                { member_id: childId, related_member_id: memberId, type: 'parent' }
+              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
+            }
+          }
+        }
+      } catch (relErr) {
+        setImportError('Members imported, but failed to import some relationships.')
+      }
+      if (successCount > 0) {
+        setImportSuccess(`Successfully imported ${successCount} member(s).${failCount > 0 ? ` Failed to import ${failCount} row(s).` : ''}`)
+      } else {
+        setImportError("Failed to import any members. Please check your file format and data.")
+      }
+    }
+    reader.readAsBinaryString(file)
+  }
+
+  const toggleMaximize = () => {
+    setIsMaximized(!isMaximized)
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)]">
-      <div className="flex justify-between mb-4">
-        <Tabs value={view} onValueChange={(v) => setView(v as "tree" | "timeline")}>
-          <TabsList>
-            <TabsTrigger value="tree">
+    <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[9999] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
+      <div className={`flex flex-col sm:flex-row justify-between gap-2 ${isMaximized ? 'p-2' : 'mb-4'}`}>
+        <Tabs value={view} onValueChange={(v) => setView(v as "tree" | "timeline")} className="w-full sm:w-auto">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="tree" className="flex-1 sm:flex-none">
               <GitBranch className="h-4 w-4 mr-2" />
-              Tree View
+              <span className="hidden sm:inline">Tree View</span>
+              <span className="sm:hidden">Tree</span>
             </TabsTrigger>
-            <TabsTrigger value="timeline">
+            <TabsTrigger value="timeline" className="flex-1 sm:flex-none">
               <Timeline className="h-4 w-4 mr-2" />
-              Timeline View
+              <span className="hidden sm:inline">Timeline View</span>
+              <span className="sm:hidden">Timeline</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handleZoomOut}>
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
-          <Button variant="outline" size="icon" onClick={handleZoomIn}>
-            <ZoomIn className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handleZoomOut}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
+            <Button variant="outline" size="icon" onClick={handleZoomIn}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
 
           <ExportButton familyId={familyId} />
+          <ShareButton familyId={familyId} familyName={familyMembers[0]?.familyName || "Family Tree"} />
 
           {isAdmin && (
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Member
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setShowAddDialog(true)} className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap">
+                <Plus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Add Member</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
+              <label htmlFor="import-excel" className="whitespace-nowrap">
+                <input
+                  id="import-excel"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style={{ display: 'none' }}
+                  onChange={handleImportExcel}
+                />
+                <Button
+                  asChild
+                  className="bg-blue-700 text-white hover:bg-blue-800"
+                >
+                  <div>
+                    <span className="hidden sm:inline">Import from Excel</span>
+                    <span className="sm:hidden">Import</span>
+                  </div>
+                </Button>
+              </label>
+            </div>
           )}
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 border rounded-lg overflow-hidden tree-canvas">
+      {(importError || importSuccess) && (
+        <div className="mb-4">
+          {importError && (
+            <div className="text-red-600 text-sm whitespace-pre-line">
+              {importError}
+            </div>
+          )}
+          {importSuccess && (
+            <div className="text-green-600 text-sm whitespace-pre-line">
+              {importSuccess}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div 
+        ref={containerRef} 
+        className={`flex-1 ${isMaximized ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative`}
+      >
+        <Button 
+          variant="outline" 
+          size="icon" 
+          onClick={toggleMaximize}
+          className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"
+        >
+          {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
         <div
           style={{
             transform: `scale(${zoom})`,
