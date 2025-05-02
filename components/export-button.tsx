@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Download, FileText, Image } from "lucide-react"
+import { Download as DownloadIcon, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 interface ExportButtonProps {
@@ -697,14 +697,14 @@ export function ExportButton({ familyId }: ExportButtonProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" disabled={isExporting}>
-          <Download className="h-4 w-4 mr-2" />
+          <DownloadIcon className="h-4 w-4 mr-2" />
           {isExporting ? "Exporting..." : "Export"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleExport("excel")}> <FileText className="h-4 w-4 mr-2" /> Export as Excel </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExport("svg")}> <FileText className="h-4 w-4 mr-2" /> Export as SVG </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleExport("png")}> <Image className="h-4 w-4 mr-2" /> Export as PNG </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("excel")}> <FileTextIcon className="h-4 w-4 mr-2" /> Export as Excel </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("svg")}> <FileTextIcon className="h-4 w-4 mr-2" /> Export as SVG </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("png")}> <ImageIcon className="h-4 w-4 mr-2" /> Export as PNG </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

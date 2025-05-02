@@ -326,7 +326,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
 
           {isAdmin && (
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setShowAddDialog(true)} className="bg-green-600 hover:bg-green-700 text-white whitespace-nowrap">
+              <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">
                 <Plus className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Add Member</span>
                 <span className="sm:hidden">Add</span>
@@ -334,7 +334,8 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
               <Button 
                 onClick={handleDetectSiblings} 
                 disabled={isDetectingSiblings}
-                className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                variant="info"
+                className="whitespace-nowrap"
               >
                 <Users className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Detect Siblings</span>
@@ -350,7 +351,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
                 />
                 <Button
                   asChild
-                  className="bg-blue-700 text-white hover:bg-blue-800"
+                  variant="info"
                 >
                   <div>
                     <span className="hidden sm:inline">Import from Excel</span>

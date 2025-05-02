@@ -13,7 +13,15 @@ export default async function AdminPage() {
   }
 
   const supabase = createAdminClient()
-  const { data: familyMembers, error } = await supabase.from("family_members").select("*")
+  const { data: familyMembers, error } = await supabase
+    .from("family_members")
+    .select(`
+      *,
+      relationships:relationships!member_id(
+        type,
+        related_member_id
+      )
+    `)
 
   if (error) {
     console.error("Error fetching family members:", error)

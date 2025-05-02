@@ -16,8 +16,17 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Drawer, DrawerContent } from "@/components/ui/drawer"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { formatDistanceToNow } from "date-fns"
+import { createClient } from "@/lib/supabase/client"
+
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  photoUrl?: string
+  role: string
+}
 
 export function Header() {
   const { session, signOut } = useSupabaseAuth();
@@ -29,6 +38,26 @@ export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState(session?.notifications || []);
   const [unreadNotifications, setUnreadNotifications] = useState(notifications.filter(n => !n.read).length);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (session?.user?.id) {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!error && data) {
+          setUserProfile(data);
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [session?.user?.id]);
 
   const handleLogout = async () => {
     try {
@@ -52,18 +81,19 @@ export function Header() {
   // Use session?.user or session directly for authentication
   const isAuthenticated = !!session?.user || !!session;
   const user = session?.user || session;
-  const userName = user?.name || "User";
-  const userEmail = user?.email || "";
-  const userPhotoUrl = user?.photoUrl || "/placeholder.svg?height=32&width=32";
+  const userName = userProfile?.name || user?.name || "User";
+  const userEmail = userProfile?.email || user?.email || "";
+  const userPhotoUrl = userProfile?.photoUrl || user?.photoUrl || "/placeholder.svg?height=32&width=32";
   const userInitials = userName ? userName.substring(0, 2).toUpperCase() : "U";
 
   // Check if user is authenticated and has a role
-  const userRole = user?.role || "viewer"
+  const userRole = userProfile?.role || user?.role || "viewer"
   const isAdmin = userRole === "admin" || userRole === "super_admin"
   const isSuperAdmin = userRole === "super_admin"
 
   // Navigation links
   const navLinks = [
+    { href: "/", label: "Home" },
     { href: "/tree", label: "Tree View" },
     { href: "/dashboard", label: "Dashboard" },
     { href: "/admin", label: "Admin Dashboard", admin: true },
@@ -172,7 +202,7 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={userPhotoUrl || "/placeholder.svg"} alt={userName} />
+                      <AvatarImage src={userPhotoUrl} alt={userName} />
                       <AvatarFallback>{userInitials}</AvatarFallback>
                     </Avatar>
                   </Button>

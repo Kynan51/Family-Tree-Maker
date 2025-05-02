@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -14,9 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { FamilyMember, Relationship } from "@/lib/types"
-import { updateFamilyMember } from "@/lib/actions"
+import { updateFamilyMember, getFamilyMemberRelationships } from "@/lib/actions"
 import { toast } from "@/components/ui/use-toast"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -34,6 +36,7 @@ interface EditFamilyMemberDialogProps {
   member: FamilyMember
   existingMembers: FamilyMember[]
   onUpdate?: (member: FamilyMember) => void
+  familyId: string
 }
 
 export function EditFamilyMemberDialog({
@@ -42,30 +45,116 @@ export function EditFamilyMemberDialog({
   member,
   existingMembers,
   onUpdate,
+  familyId,
 }: EditFamilyMemberDialogProps) {
-  const [activeTab, setActiveTab] = useState("details")
-  const [selectedParents, setSelectedParents] = useState<string[]>(
-    member.relationships?.filter((r) => r.type === "parent").map((r) => r.relatedMemberId) || [],
-  )
-  const [selectedSpouse, setSelectedSpouse] = useState<string | null>(
-    member.relationships?.find((r) => r.type === "spouse")?.relatedMemberId || null,
-  )
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  if (!familyId) {
+    return (
+      <div style={{ padding: 24, textAlign: 'center' }}>
+        <strong>Please select a family first to add a member.</strong>
+      </div>
+    );
+  }
 
+  console.log("EditFamilyMemberDialog - Initial member data:", member)
+  console.log("EditFamilyMemberDialog - Existing members:", existingMembers)
+
+  const [activeTab, setActiveTab] = useState("details")
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Initialize relationships from member data
+  const [selectedParents, setSelectedParents] = useState<string[]>([]);
+  const [selectedSpouse, setSelectedSpouse] = useState<string[]>([]);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+
+  // Filter members to only show those in the same family
+  const familyMembers = existingMembers.filter(
+    m => (m.familyId === familyId || m.family_id === familyId) && m.id !== member.id
+  );
+  console.log("EditFamilyMemberDialog - Filtered family members:", familyMembers)
+
+  // Initialize form with member data
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: member.fullName,
-      yearOfBirth: member.yearOfBirth,
-      livingPlace: member.livingPlace,
-      isDeceased: member.isDeceased,
-      maritalStatus: member.maritalStatus,
-      photoUrl: member.photoUrl || "",
+      fullName: member.fullName || member.name || member.full_name || "",
+      yearOfBirth: member.yearOfBirth || member.year_of_birth,
+      livingPlace: member.livingPlace || member.living_place,
+      isDeceased: member.isDeceased || member.is_deceased || false,
+      maritalStatus: member.maritalStatus || member.marital_status || "Single",
+      photoUrl: member.photoUrl || member.photo_url || "",
       occupation: member.occupation || "",
     },
   })
 
+  // Fetch relationships when member changes (only if editing existing member)
+  useEffect(() => {
+    if (!member.id) {
+      setSelectedParents([]);
+      setSelectedSpouse([]);
+      setIsLoading(false);
+      return;
+    }
+    const fetchRelationships = async () => {
+      setIsLoading(true);
+      try {
+        const relationships = await getFamilyMemberRelationships(member.id);
+        console.log("EditFamilyMemberDialog - Fetched relationships:", relationships);
+        const parentIds = relationships
+          .filter(r => r.type === "parent")
+          .map(r => r.related_member_id);
+        const spouseIds = relationships
+          .filter(r => r.type === "spouse")
+          .map(r => r.related_member_id);
+        setSelectedParents(parentIds);
+        setSelectedSpouse(spouseIds);
+      } catch (error) {
+        console.error("Error fetching relationships:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load relationships",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRelationships();
+  }, [member.id]);
+
+  console.log("EditFamilyMemberDialog - Initial form values:", form.getValues())
+
+  // Reset form when member changes
+  useEffect(() => {
+    console.log("EditFamilyMemberDialog - Member changed, resetting form")
+    console.log("EditFamilyMemberDialog - New member data:", member)
+    
+    // Reset form values
+    form.reset({
+      fullName: member.fullName || member.name || member.full_name || "",
+      yearOfBirth: member.yearOfBirth || member.year_of_birth,
+      livingPlace: member.livingPlace || member.living_place,
+      isDeceased: member.isDeceased || member.is_deceased || false,
+      maritalStatus: member.maritalStatus || member.marital_status || "Single",
+      photoUrl: member.photoUrl || member.photo_url || "",
+      occupation: member.occupation || "",
+    })
+    
+    // Set active tab to details when member changes
+    setActiveTab("details");
+    
+    console.log("EditFamilyMemberDialog - Form values after reset:", form.getValues())
+  }, [member, form])
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    console.log("EditFamilyMemberDialog - Starting form submission")
+    console.log("EditFamilyMemberDialog - Form values:", values)
+    console.log("EditFamilyMemberDialog - Selected relationships:", {
+      parents: selectedParents,
+      spouse: selectedSpouse
+    })
+    
     setIsSubmitting(true)
 
     try {
@@ -80,28 +169,42 @@ export function EditFamilyMemberDialog({
         })
       })
 
-      // Add spouse relationship
-      if (selectedSpouse) {
+      // Add spouse relationships
+      selectedSpouse.forEach((spouseId) => {
         relationships.push({
           type: "spouse",
-          relatedMemberId: selectedSpouse,
+          relatedMemberId: spouseId,
         })
-      }
+      })
 
-      // Update family member
+      console.log("EditFamilyMemberDialog - Created relationships array:", relationships)
+
+      // Transform form values to match database schema
       const updatedMember: FamilyMember = {
-        ...member,
-        ...values,
+        id: member.id,
+        fullName: values.fullName,
+        yearOfBirth: values.yearOfBirth,
+        livingPlace: values.livingPlace,
+        isDeceased: values.isDeceased,
+        maritalStatus: values.maritalStatus,
+        photoUrl: values.photoUrl,
+        occupation: values.occupation,
         relationships,
         updatedAt: new Date().toISOString(),
+        familyId: member.familyId,
+        createdAt: member.createdAt,
       }
+
+      console.log("EditFamilyMemberDialog - Updated member object:", updatedMember)
 
       // Save to database
       await updateFamilyMember(updatedMember)
+      console.log("EditFamilyMemberDialog - Successfully saved to database")
 
       // Update local state if callback provided
       if (onUpdate) {
         onUpdate(updatedMember)
+        console.log("EditFamilyMemberDialog - Called onUpdate callback")
       }
 
       toast({
@@ -111,7 +214,7 @@ export function EditFamilyMemberDialog({
 
       onOpenChange(false)
     } catch (error) {
-      console.error("Error updating family member:", error)
+      console.error("EditFamilyMemberDialog - Error updating family member:", error)
       toast({
         title: "Error",
         description: "Failed to update family member",
@@ -122,8 +225,7 @@ export function EditFamilyMemberDialog({
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleFileUpload = async (file: File) => {
     if (!file) return
 
     const formData = new FormData()
@@ -150,6 +252,32 @@ export function EditFamilyMemberDialog({
     }
   }
 
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith("image/")) {
+      handleFileUpload(file)
+    } else {
+      toast({
+        title: "Error",
+        description: "Please upload an image file",
+        variant: "destructive",
+      })
+    }
+  }, [])
+
+  const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -166,92 +294,167 @@ export function EditFamilyMemberDialog({
           <TabsContent value="details" className="py-4">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    value={form.watch("fullName")}
-                    onChange={(e) => form.setValue("fullName", e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="yearOfBirth">Year of Birth</Label>
-                  <Input
-                    id="yearOfBirth"
-                    type="number"
-                    value={form.watch("yearOfBirth")}
-                    onChange={(e) => form.setValue("yearOfBirth", e.target.value)}
-                    placeholder="Year of birth (e.g. 1995)"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="livingPlace">Living Place</Label>
-                  <Input
-                    id="livingPlace"
-                    value={form.watch("livingPlace")}
-                    onChange={(e) => form.setValue("livingPlace", e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="occupation">Occupation</Label>
-                  <Input
-                    id="occupation"
-                    value={form.watch("occupation")}
-                    onChange={(e) => form.setValue("occupation", e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maritalStatus">Marital Status</Label>
-                  <Select
-                    value={form.watch("maritalStatus")}
-                    onValueChange={(value) => form.setValue("maritalStatus", value as "Single" | "Married" | "Divorced" | "Widowed")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Single">Single</SelectItem>
-                      <SelectItem value="Married">Married</SelectItem>
-                      <SelectItem value="Divorced">Divorced</SelectItem>
-                      <SelectItem value="Widowed">Widowed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isDeceased"
-                    checked={form.watch("isDeceased")}
-                    onCheckedChange={(checked) => form.setValue("isDeceased", checked as boolean)}
-                  />
-                  <Label htmlFor="isDeceased">Deceased</Label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="photoUrl">Profile Photo</Label>
-                  <div className="space-y-2">
-                    <Input type="file" accept="image/*" onChange={handleFileUpload} />
-                    {form.watch("photoUrl") && (
-                      <div className="mt-2">
-                        <img
-                          src={form.watch("photoUrl") || "/placeholder.svg"}
-                          alt="Preview"
-                          className="w-20 h-20 object-cover rounded-full"
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter full name" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="yearOfBirth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year of Birth</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="livingPlace"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Living Place</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter living place" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="occupation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Occupation</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter occupation (optional)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="maritalStatus"
+                  render={({ field }) => {
+                    console.log("EditFamilyMemberDialog - Marital status field value:", field.value)
+                    return (
+                      <FormItem>
+                        <FormLabel>Marital Status</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            console.log("EditFamilyMemberDialog - Marital status changed to:", value)
+                            field.onChange(value)
+                          }}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select marital status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="isDeceased"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
                         />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Deceased</FormLabel>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancel
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="photoUrl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Profile Photo</FormLabel>
+                      <FormControl>
+                        <div
+                          className={cn(
+                            "flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors",
+                            isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                          )}
+                          onDrop={onDrop}
+                          onDragOver={onDragOver}
+                          onDragLeave={onDragLeave}
+                        >
+                          <div className="relative h-32 w-32">
+                            <img
+                              src={field.value || "/placeholder.svg?height=128&width=128"}
+                              alt="Profile"
+                              className="h-full w-full object-cover rounded-full"
+                            />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {isDragging ? "Drop your image here" : "Drag and drop an image here, or click to select"}
+                            </p>
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                              className="hidden"
+                              id="profile-photo-upload"
+                            />
+                            <Button
+                              variant="outline"
+                              onClick={() => document.getElementById("profile-photo-upload")?.click()}
+                            >
+                              Select Image
+                            </Button>
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
+                    Next
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : "Save"}
-                  </Button>
-                </div>
+                </DialogFooter>
               </form>
             </Form>
           </TabsContent>
@@ -261,32 +464,30 @@ export function EditFamilyMemberDialog({
               <div>
                 <h3 className="text-sm font-medium mb-2">Parents</h3>
                 <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                  {existingMembers.filter((m) => m.id !== member.id).length === 0 ? (
+                  {familyMembers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
                   ) : (
-                    existingMembers
-                      .filter((m) => m.id !== member.id)
-                      .map((existingMember) => (
-                        <div key={existingMember.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`parent-${existingMember.id}`}
-                            checked={selectedParents.includes(existingMember.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedParents((prev) => [...prev, existingMember.id])
-                              } else {
-                                setSelectedParents((prev) => prev.filter((id) => id !== existingMember.id))
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`parent-${existingMember.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {existingMember.fullName} (b. {existingMember.yearOfBirth})
-                          </label>
-                        </div>
-                      ))
+                    familyMembers.map((existingMember) => (
+                      <div key={existingMember.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`parent-${existingMember.id}`}
+                          checked={selectedParents.includes(existingMember.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedParents((prev) => [...prev, existingMember.id])
+                            } else {
+                              setSelectedParents((prev) => prev.filter((id) => id !== existingMember.id))
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`parent-${existingMember.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
+                        </label>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -294,51 +495,45 @@ export function EditFamilyMemberDialog({
               <div>
                 <h3 className="text-sm font-medium mb-2">Spouse</h3>
                 <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                  {existingMembers.filter((m) => m.id !== member.id).length === 0 ? (
+                  {familyMembers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
                   ) : (
-                    existingMembers
-                      .filter((m) => m.id !== member.id)
-                      .map((existingMember) => (
-                        <div key={existingMember.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`spouse-${existingMember.id}`}
-                            checked={selectedSpouse === existingMember.id}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedSpouse(existingMember.id)
-                              } else {
-                                setSelectedSpouse(null)
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`spouse-${existingMember.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {existingMember.fullName} (b. {existingMember.yearOfBirth})
-                          </label>
-                        </div>
-                      ))
+                    familyMembers.map((existingMember) => (
+                      <div key={existingMember.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`spouse-${existingMember.id}`}
+                          checked={selectedSpouse.includes(existingMember.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSpouse((prev) => [...prev, existingMember.id])
+                            } else {
+                              setSelectedSpouse((prev) => prev.filter((id) => id !== existingMember.id))
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`spouse-${existingMember.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
+                        </label>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
             </div>
+
+            <DialogFooter className="mt-4">
+              <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
+                Back
+              </Button>
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
           </TabsContent>
         </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          {activeTab === "details" ? (
-            <Button onClick={() => setActiveTab("relationships")}>Next</Button>
-          ) : (
-            <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save"}
-            </Button>
-          )}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

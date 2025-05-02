@@ -229,7 +229,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
           <span className="text-xs text-muted-foreground truncate w-full text-center" title={nodeDatum.attributes.relation}>{nodeDatum.attributes.relation}</span>
         </div>
         {isAdmin && (
-          <Button className="bg-green-600 hover:bg-green-700 text-white w-full" onClick={(e) => { e.stopPropagation(); onAdd(nodeDatum); }}>
+          <Button variant="success" className="w-full" onClick={(e) => { e.stopPropagation(); onAdd(nodeDatum); }}>
             <User2 className="h-4 w-4 mr-2" />
             Add
           </Button>
@@ -344,7 +344,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
 
 function normalizeMembers(members: any[]): any[] {
   const normalizedData = members.map(m => {
-    const name = m.name ?? m.full_name ?? "";
+    const name = m.name ?? m.full_name ?? m.fullName ?? "";
     return {
       ...m,
       name,
@@ -585,7 +585,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
           ))}
           {/* Add member button for admins */}
           {isAdmin && (
-            <Button className="bg-green-600 hover:bg-green-700 text-white w-full" style={{ pointerEvents: 'auto', height: 36, alignSelf: 'center' }} onClick={() => { if (main) setSelectedMember(main); setShowAddDialog(true); }}>
+            <Button variant="success" className="w-full" style={{ pointerEvents: 'auto', height: 36, alignSelf: 'center' }} onClick={() => { if (main) setSelectedMember(main); setShowAddDialog(true); }}>
               <User2 className="h-4 w-4 mr-2" />
               Add Member
             </Button>

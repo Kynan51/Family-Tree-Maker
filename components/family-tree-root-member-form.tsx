@@ -85,7 +85,7 @@ export function FamilyTreeRootMemberForm({ familyId, userId }: { familyId: strin
       </div>
       {error && <div className="text-red-600 mb-2">{error}</div>}
       {success && <div className="text-green-600 mb-2">Member added!</div>}
-      <button type="submit" className="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-semibold" disabled={loading}>
+      <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold transition-colors" disabled={loading}>
         {loading ? "Adding..." : "Add First Member"}
       </button>
     </form>

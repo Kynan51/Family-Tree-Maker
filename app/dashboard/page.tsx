@@ -17,7 +17,15 @@ export default async function DashboardPage() {
   // Handle admin/super_admin view
   if (session.user.role === "admin" || session.user.role === "super_admin") {
     const adminClient = createAdminClient()
-    const { data: familyMembers, error } = await adminClient.from("family_members").select("*")
+    const { data: familyMembers, error } = await adminClient
+      .from("family_members")
+      .select(`
+        *,
+        relationships:relationships!member_id(
+          type,
+          related_member_id
+        )
+      `)
 
     if (error) {
       console.error("Error fetching family members:", error)

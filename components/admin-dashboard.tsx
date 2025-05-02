@@ -145,6 +145,7 @@ export function AdminDashboard({ familyMembers: initialMembers, familyId, isPubl
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 hover:bg-green-100 hover:text-green-600"
                         onClick={() => setMemberToEdit(member)}
                       >
                         <Pencil className="h-4 w-4" />
@@ -152,6 +153,7 @@ export function AdminDashboard({ familyMembers: initialMembers, familyId, isPubl
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 hover:bg-red-100 hover:text-red-600"
                         onClick={() => setMemberToDelete(member)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -182,6 +184,7 @@ export function AdminDashboard({ familyMembers: initialMembers, familyId, isPubl
           onOpenChange={() => setMemberToEdit(null)}
           member={memberToEdit}
           onUpdate={handleUpdateMember}
+          existingMembers={familyMembers}
         />
       )}
 

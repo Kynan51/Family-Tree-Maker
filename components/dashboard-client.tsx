@@ -32,7 +32,15 @@ export function DashboardClient() {
     const fetchData = async () => {
       try {
         if (session.user.role === "admin" || session.user.role === "super_admin") {
-          const { data: familyMembers, error } = await supabase.from("family_members").select("*")
+          const { data: familyMembers, error } = await supabase
+            .from("family_members")
+            .select(`
+              *,
+              relationships:relationships!member_id(
+                type,
+                related_member_id
+              )
+            `)
           if (error) throw error
           setAdminData({ familyMembers })
         } else {

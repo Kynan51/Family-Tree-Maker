@@ -631,7 +631,7 @@ export function AddFamilyMemberDialog({
                   <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
                     Back
                   </Button>
-                  <Button type="button" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
+                  <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
                     {isSubmitting ? "Saving..." : "Save"}
                   </Button>
                 </DialogFooter>

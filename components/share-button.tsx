@@ -112,7 +112,7 @@ export function ShareButton({ familyId, familyName, isPublic }: ShareButtonProps
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" variant="success" disabled={isLoading}>
                 {isLoading ? "Sending..." : "Send"}
               </Button>
             </form>

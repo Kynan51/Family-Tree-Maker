@@ -379,7 +379,7 @@ export default function CreateFamilyPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={isLoading}>
               {isLoading ? "Creating..." : "Create Family Tree"}
             </Button>
           </CardFooter>
