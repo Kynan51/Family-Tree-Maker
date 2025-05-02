@@ -28,19 +28,16 @@ export function FamilyTree({ members }: FamilyTreeProps) {
     return acc
   }, {} as Record<number, FamilyMember[]>)
 
-  const handleAddMember = (newMember: FamilyMember) => {
-    // This would be handled by the parent component
-    // console.log("New member added:", newMember)
+  const handleMemberAdded = (newMember: FamilyMember) => {
+    setMembers(prev => [...prev, newMember]);
   }
 
-  const handleUpdateMember = (updatedMember: FamilyMember) => {
-    // This would be handled by the parent component
-    // console.log("Member updated:", updatedMember)
+  const handleMemberUpdated = (updatedMember: FamilyMember) => {
+    setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
   }
 
-  const handleDeleteMember = (id: string) => {
-    // This would be handled by the parent component
-    // console.log("Member deleted:", id)
+  const handleMemberDeleted = (id: string) => {
+    setMembers(prev => prev.filter(m => m.id !== id));
   }
 
   return (
@@ -112,7 +109,7 @@ export function FamilyTree({ members }: FamilyTreeProps) {
         <AddFamilyMemberDialog
           open={showAddDialog}
           onOpenChange={setShowAddDialog}
-          onAdd={handleAddMember}
+          onAdd={handleMemberAdded}
           existingMembers={members}
         />
       )}
@@ -122,7 +119,7 @@ export function FamilyTree({ members }: FamilyTreeProps) {
           open={true}
           onOpenChange={() => setMemberToEdit(null)}
           member={memberToEdit}
-          onUpdate={handleUpdateMember}
+          onUpdate={handleMemberUpdated}
           existingMembers={members}
         />
       )}
@@ -132,7 +129,7 @@ export function FamilyTree({ members }: FamilyTreeProps) {
           open={true}
           onOpenChange={() => setMemberToDelete(null)}
           member={memberToDelete}
-          onDelete={handleDeleteMember}
+          onDelete={handleMemberDeleted}
         />
       )}
     </div>

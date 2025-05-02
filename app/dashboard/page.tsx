@@ -6,45 +6,52 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { ClientAuthFallback } from "@/components/client-auth-fallback"
 
+interface AccessRequest {
+  id: string
+  family_id: string
+  status: string
+}
+
 export default async function DashboardPage() {
   const session = await getServerSession()
 
   if (!session) {
-    // Use client-side fallback for robust auth handling
     return <ClientAuthFallback />
   }
 
   // Handle admin/super_admin view
   if (session.user.role === "admin" || session.user.role === "super_admin") {
     const adminClient = createAdminClient()
-    const { data: familyMembers, error } = await adminClient
-      .from("family_members")
-      .select(`
-        *,
-        relationships:relationships!member_id(
-          type,
-          related_member_id
-        )
-      `)
+    
+    // Fetch data in parallel
+    const [familyMembersResult, familyResult] = await Promise.all([
+      adminClient
+        .from("family_members")
+        .select(`
+          *,
+          relationships:relationships!member_id(
+            type,
+            related_member_id
+          )
+        `),
+      adminClient
+        .from("families")
+        .select("id, is_public")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+    ])
 
-    if (error) {
-      console.error("Error fetching family members:", error)
+    if (familyMembersResult.error) {
+      console.error("Error fetching family members:", familyMembersResult.error)
       return <div>Error loading dashboard</div>
     }
 
-    // Get the first family's ID and privacy status
-    const { data: family } = await adminClient
-      .from("families")
-      .select("id, is_public")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
-
     return (
       <AdminDashboard 
-        familyMembers={familyMembers} 
-        familyId={family?.id}
-        isPublic={family?.is_public}
+        familyMembers={familyMembersResult.data} 
+        familyId={familyResult.data?.id}
+        isPublic={familyResult.data?.is_public}
       />
     )
   }
@@ -52,51 +59,33 @@ export default async function DashboardPage() {
   // Handle regular user view
   const supabase = createClient()
 
-  // Get user's accessible families
+  // First get access requests to determine which families to fetch
   const { data: accessRequests } = await supabase
     .from("user_family_access")
     .select("*, family:families(*)")
     .eq("user_id", session.user.id)
 
-  // Get user's accessible families that are approved
-  const { data: accessibleFamilies } = await supabase
-    .from("families")
-    .select("*, members:family_members(*), admins:user_family_access!inner(user_id)")
-    .in("id", accessRequests?.filter(req => req.status === "approved").map(req => req.family_id) || [])
+  const approvedFamilyIds = accessRequests
+    ?.filter((req: AccessRequest) => req.status === "approved")
+    .map(req => req.family_id) || []
 
-  // Get user's family access information
-  const { data: userFamilyAccess } = await supabase
-    .from("user_family_access")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .eq("status", "approved")
-
-  // Debug logging
-  console.log("Dashboard Debug Info:", {
-    userId: session.user.id,
-    userRole: session.user.role,
-    accessibleFamilies: accessibleFamilies?.map(f => ({
-      id: f.id,
-      name: f.name,
-      created_by: f.created_by,
-      admins: f.admins?.map((a: { user_id: string }) => a.user_id) || []
-    })),
-    userFamilyAccess: userFamilyAccess?.map(a => ({
-      familyId: a.family_id,
-      accessLevel: a.access_level,
-      status: a.status
-    })),
-    accessRequests: accessRequests?.map(r => ({
-      familyId: r.family_id,
-      accessLevel: r.access_level,
-      status: r.status
-    }))
-  })
+  // Then fetch remaining data in parallel
+  const [accessibleFamiliesResult, userFamilyAccessResult] = await Promise.all([
+    supabase
+      .from("families")
+      .select("*, members:family_members(*), admins:user_family_access!inner(user_id)")
+      .in("id", approvedFamilyIds),
+    supabase
+      .from("user_family_access")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("status", "approved")
+  ])
 
   return (
     <UserDashboard
       userId={session.user.id}
-      accessibleFamilies={accessibleFamilies || []}
+      accessibleFamilies={accessibleFamiliesResult.data || []}
       accessRequests={accessRequests || []}
     />
   )

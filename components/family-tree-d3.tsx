@@ -450,8 +450,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
   // Set family ID in window object for export functionality
   useEffect(() => {
     if (familyId) {
-      console.log('FamilyTreeD3: Setting familyId in window:', familyId)
-      ;(window as WindowWithFamilyId).familyId = familyId
+      (window as any).__family_id__ = familyId;
     }
   }, [familyId])
 
@@ -504,7 +503,6 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
       // Get family ID from the first member's data
       const familyId = membersState[0]?.familyId;
       if (familyId) {
-        console.log('Setting family ID in window:', familyId);
         (window as any).__tree_family_id__ = familyId;
       }
     }
@@ -518,7 +516,6 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
       // Get family ID from the first member's data
       const familyId = membersState[0]?.familyId;
       if (familyId) {
-        console.log('Setting family ID in window:', familyId);
         (window as any).__tree_family_id__ = familyId;
       }
     }

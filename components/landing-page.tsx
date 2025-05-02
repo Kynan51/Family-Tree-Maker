@@ -1,4 +1,4 @@
-import Link from "next/link"
+import { LoadingLink } from "@/components/ui/loading-link"
 import { Button } from "@/components/ui/button"
 import { Users } from "lucide-react"
 
@@ -18,10 +18,10 @@ export function LandingPage() {
               size="lg"
               className="bg-green-700 hover:bg-green-800 dark:bg-green-800 dark:hover:bg-green-700"
             >
-              <Link href="/auth/signin">Get Started</Link>
+              <LoadingLink href="/auth/signin">Get Started</LoadingLink>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/tree/demo">View Demo</Link>
+              <LoadingLink href="/tree/demo">View Demo</LoadingLink>
             </Button>
           </div>
         </div>

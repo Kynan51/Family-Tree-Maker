@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { LoadingLink } from "@/components/ui/loading-link"
 import { Button } from "@/components/ui/button"
 
 export default function NotFound() {
@@ -12,7 +12,7 @@ export default function NotFound() {
         Sorry, the page you are looking for does not exist or has been moved.
       </div>
       <Button asChild size="lg">
-        <Link href="/">Go Home</Link>
+        <LoadingLink href="/">Go Home</LoadingLink>
       </Button>
     </div>
   )

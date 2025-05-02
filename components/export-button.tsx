@@ -278,10 +278,7 @@ const generateFamilyTreeSVG = (): string | null => {
   // Get members state from window
   const membersState = (window as any).__tree_members_state__
   
-  console.log('Initial members state:', membersState)
-  
   if (!membersState || !Array.isArray(membersState)) {
-    console.error('Missing or invalid members data for SVG export')
     return null
   }
 
@@ -290,57 +287,43 @@ const generateFamilyTreeSVG = (): string | null => {
   const processedRelationships = new Set<string>()
   
   // First pass: create unique member objects
-  console.log('Starting first pass - creating member objects')
   membersState.forEach(m => {
-    if (!memberMap.has(m.id)) {
-      const memberObj: Member = {
-        ...m,
-        children: [],
-        partners: [],
-        subtreeWidth: 0,
-        subtreeHeight: 0,
-        level: 0,
-        _rendered: false
-      }
-      memberMap.set(m.id, memberObj)
-      console.log(`Created member object for ${m.name} (ID: ${m.id})`)
-    }
+    memberMap.set(m.id, {
+      ...m,
+      children: [],
+      partners: [],
+      subtreeWidth: 0,
+      subtreeHeight: 0,
+      level: 0,
+      _rendered: false
+    })
   })
 
   // Second pass: handle relationships
-  console.log('\nStarting second pass - processing relationships')
   membersState.forEach((member: Member) => {
-    console.log(`\nProcessing relationships for ${member.name} (ID: ${member.id})`)
     if (!member.relationships) {
-      console.log('No relationships found for this member')
       return
     }
     
-    console.log('Relationships:', member.relationships)
     member.relationships.forEach((rel: Relationship) => {
       const [id1, id2] = [member.id, rel.relatedMemberId].sort()
       const relationshipKey = `${id1}-${id2}-${rel.type}`
       
-      console.log(`\nProcessing relationship: ${relationshipKey}`)
       if (processedRelationships.has(relationshipKey)) {
-        console.log('Relationship already processed, skipping')
         return
       }
       
       const relatedMember = memberMap.get(rel.relatedMemberId)
       if (!relatedMember) {
-        console.log('Related member not found in map')
         return
       }
       
       if (rel.type === "parent") {
-        console.log(`Processing parent relationship: ${member.name} has parent ${relatedMember.name}`)
         const member1 = memberMap.get(member.id)
         const member2 = relatedMember
         
         // Skip if either member is missing birth year
         if (!member1?.yearOfBirth || !member2?.yearOfBirth) {
-          console.log('Skipping relationship - missing birth year')
           return
         }
         
@@ -352,16 +335,13 @@ const generateFamilyTreeSVG = (): string | null => {
         if (!parentMember.children.some(c => c.id === childMember.id)) {
           parentMember.children.push(childMember)
           processedRelationships.add(relationshipKey)
-          console.log(`Added ${childMember.name} as child of ${parentMember.name}`)
         }
       } else if (rel.type === "child") {
-        console.log(`Processing child relationship: ${member.name} has child ${relatedMember.name}`)
         const member1 = memberMap.get(member.id)
         const member2 = relatedMember
         
         // Skip if either member is missing birth year
         if (!member1?.yearOfBirth || !member2?.yearOfBirth) {
-          console.log('Skipping relationship - missing birth year')
           return
         }
         
@@ -373,10 +353,8 @@ const generateFamilyTreeSVG = (): string | null => {
         if (!parentMember.children.some(c => c.id === childMember.id)) {
           parentMember.children.push(childMember)
           processedRelationships.add(relationshipKey)
-          console.log(`Added ${childMember.name} as child of ${parentMember.name}`)
         }
       } else if (rel.type === "spouse") {
-        console.log(`Processing spouse relationship between ${member.name} and ${relatedMember.name}`)
         const member1 = memberMap.get(id1)
         if (member1) {
           if (!member1.partners) member1.partners = []
@@ -389,8 +367,6 @@ const generateFamilyTreeSVG = (): string | null => {
               if (!partner.partners.some(p => p.id === id1)) {
                 partner.partners.push(member1)
               }
-              processedRelationships.add(relationshipKey)
-              console.log(`Added spouse relationship between ${member1.name} and ${relatedMember.name}`)
             }
           }
         }
@@ -399,7 +375,6 @@ const generateFamilyTreeSVG = (): string | null => {
   })
 
   // Find root members
-  console.log('\nFinding root members')
   const rootMembers = Array.from(memberMap.values()).filter(member => {
     // A member is a root if they have no parent relationships
     const isRoot = !membersState.some(m => 
@@ -407,35 +382,15 @@ const generateFamilyTreeSVG = (): string | null => {
         rel.type === "parent" && rel.relatedMemberId === member.id
       )
     )
-    console.log(`Checking if ${member.name} is root:`, isRoot)
     return isRoot
   })
 
-  console.log('\nFinal data structures:')
-  console.log('Member map:', Object.fromEntries(memberMap))
-  console.log('Root members:', rootMembers)
-  console.log('Processed relationships:', Array.from(processedRelationships))
-
-  // Debug each member's children
-  console.log('\nChildren relationships:')
-  Array.from(memberMap.values()).forEach(member => {
-    console.log(`${member.name}'s children:`, member.children.map(c => c.name))
-  })
-
-  // Debug each member's partners
-  console.log('\nPartner relationships:')
-  Array.from(memberMap.values()).forEach(member => {
-    console.log(`${member.name}'s partners:`, member.partners.map(p => p.name))
-  })
-
   if (rootMembers.length === 0) {
-    console.error('No root members found')
     return null
   }
 
   // Sort root members by year of birth (oldest first)
   rootMembers.sort((a, b) => (a.yearOfBirth || 0) - (b.yearOfBirth || 0))
-  console.log('\nSorted root members:', rootMembers.map(m => m.name))
 
   // Reset rendered flag
   Array.from(memberMap.values()).forEach(member => {
@@ -514,46 +469,22 @@ export function ExportButton({ familyId }: ExportButtonProps) {
       }
 
       if (format === "excel") {
-        console.log('Attempting Excel export for family ID:', currentFamilyId)
-        // Construct the export URL with the familyId
-        const exportUrl = `/api/export?format=${format}&familyId=${currentFamilyId}`
-        console.log('Export URL:', exportUrl)
-        
-        // Fetch the file
-        const response = await fetch(exportUrl)
-        console.log('Export response status:', response.status)
+        const exportUrl = `/api/export?familyId=${currentFamilyId}&format=excel`;
+        const response = await fetch(exportUrl);
         
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error('Export error response:', errorData)
-          const errorMessage = errorData.details 
-            ? `${errorData.error}: ${errorData.details}`
-            : `Export failed: ${response.statusText} (${response.status})`
-          
-          toast({
-            title: "Export Failed",
-            description: errorMessage,
-            variant: "destructive",
-          })
-          throw new Error(errorMessage)
+          throw new Error('Export failed');
         }
-        
-        // Get the blob from the response
-        const blob = await response.blob()
-        console.log('Export blob size:', blob.size)
-        
-        // Create a temporary link element
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = `family-tree-${currentFamilyId}.xlsx`
-        
-        // Append to body, click, and remove
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        
-        // Clean up the URL object
-        URL.revokeObjectURL(link.href)
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `family-tree-${currentFamilyId}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
         toast({
           title: "Export Successful",
@@ -568,10 +499,6 @@ export function ExportButton({ familyId }: ExportButtonProps) {
       const membersState = (window as any).__tree_members_state__
 
       if (!nodePositions || !membersState) {
-        console.error('Missing required data for export:', {
-          hasNodePositions: !!nodePositions,
-          hasMembersState: !!membersState
-        })
         toast({
           title: "Export Failed",
           description: "Family tree is not loaded or visible. Please make sure the tree is displayed before exporting.",
@@ -656,7 +583,6 @@ export function ExportButton({ familyId }: ExportButtonProps) {
               description: "Your family tree has been exported as PNG",
             })
           } catch (error) {
-            console.error("Error converting to PNG:", error)
             toast({
               title: "Export Failed",
               description: "Failed to convert SVG to PNG",
@@ -668,7 +594,6 @@ export function ExportButton({ familyId }: ExportButtonProps) {
         }
         
         img.onerror = (error) => {
-          console.error("Error loading SVG for PNG conversion:", error)
           toast({
             title: "Export Failed",
             description: "Failed to load SVG for PNG conversion",
@@ -683,7 +608,6 @@ export function ExportButton({ familyId }: ExportButtonProps) {
         img.src = url
       }
     } catch (error) {
-      console.error("Error exporting data:", error)
       toast({
         title: "Export Failed",
         description: "There was an error exporting your data",

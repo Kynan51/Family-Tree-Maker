@@ -7,188 +7,97 @@ import ExcelJS from "exceljs"
 import { cookies } from "next/headers"
 import { createClient } from '@/lib/supabase/server'
 import * as XLSX from 'xlsx'
+import { getSession } from '@/lib/auth'
+import { getFamilyMembers } from '@/lib/data'
+import { FamilyMember } from '@/lib/types'
 
 export async function GET(request: Request) {
-  console.log('Export API called')
   try {
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.error("Session error:", sessionError)
-      return NextResponse.json({ error: "Authentication error", details: sessionError.message }, { status: 401 })
-    }
-    
+    const session = await getSession();
     if (!session) {
-      console.error("No session found")
-      return NextResponse.json({ error: "Unauthorized - No session found" }, { status: 401 })
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    const { searchParams } = new URL(request.url)
-    const familyId = searchParams.get("familyId")
-    const format = searchParams.get("format") || "excel"
-
-    console.log('Export request params:', { familyId, format })
+    const { searchParams } = new URL(request.url);
+    const familyId = searchParams.get('familyId');
+    const format = searchParams.get('format') || 'excel';
 
     if (!familyId) {
-      console.error("Export request missing familyId")
-      return NextResponse.json({ 
-        error: "Bad Request", 
-        details: "Family ID is required" 
-      }, { status: 400 })
+      return new Response(JSON.stringify({ error: 'Family ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    if (format !== "excel") {
-      console.error("Export request with invalid format:", format)
-      return NextResponse.json({ 
-        error: "Bad Request", 
-        details: "Invalid export format" 
-      }, { status: 400 })
-    }
-
-    const adminClient = createAdminClient() // Admin operation for data export
-
-    // Get family data with relationships
-    console.log('Fetching family members for ID:', familyId)
-    const { data: familyMembers, error: queryError } = await adminClient
-      .from("family_members")
-      .select(`
-        *,
-        relationships:relationships!member_id(
-          type,
-          related_member:family_members!related_member_id(
-            id,
-            full_name
-          )
-        )
-      `)
-      .eq("family_id", familyId)
-
-    if (queryError) {
-      console.error("Database query error:", queryError)
-      return NextResponse.json({ 
-        error: "Failed to fetch family data", 
-        details: queryError.message 
-      }, { status: 500 })
-    }
-
+    // Fetch family members
+    const familyMembers = await getFamilyMembers(familyId);
     if (!familyMembers || familyMembers.length === 0) {
-      console.error("No family members found for ID:", familyId)
-      return NextResponse.json({ 
-        error: "No family members found", 
-        details: "No data available for the specified family ID" 
-      }, { status: 404 })
+      return new Response(JSON.stringify({ error: 'No family members found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    console.log(`Found ${familyMembers.length} family members`)
-
-    try {
-      // Log the export
-      console.log('Logging export for user:', session.user.id)
-      await logExport(session.user.id, format, familyId)
-    } catch (logError) {
-      console.error("Error logging export:", logError)
-      // Continue with export even if logging fails
-    }
+    // Log the export
+    await logExport(session.user.id, familyId, format);
 
     // Generate Excel file
-    console.log('Generating Excel file')
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet("Family Members")
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Family Tree');
 
-    // Add headers with more comprehensive information
+    // Add headers
     worksheet.columns = [
-      { header: "Full Name", key: "full_name", width: 30 },
-      { header: "Year of Birth", key: "year_of_birth", width: 15 },
-      { header: "Living Place", key: "living_place", width: 30 },
-      { header: "Is Deceased", key: "is_deceased", width: 15 },
-      { header: "Marital Status", key: "marital_status", width: 15 },
-      { header: "Occupation", key: "occupation", width: 30 },
-      { header: "Parents", key: "parents", width: 40 },
-      { header: "Spouse(s)", key: "spouses", width: 40 },
-      { header: "Children", key: "children", width: 40 }
-    ]
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Birth Year', key: 'birthYear', width: 15 },
+      { header: 'Death Year', key: 'deathYear', width: 15 },
+      { header: 'Parents', key: 'parents', width: 40 },
+      { header: 'Spouse', key: 'spouse', width: 30 },
+      { header: 'Children', key: 'children', width: 40 },
+    ];
 
-    // Process and add rows with relationship information
-    console.log('Processing family members data')
-    const processedMembers = familyMembers.map(member => {
-      // Group relationships by type
-      const relationships = member.relationships || []
-      
-      // For parents, we need to find members who have this member as their child
-      const parents = familyMembers
-        .filter(m => m.relationships?.some((r: { type: string; related_member: { id: string } }) => 
-          r.type === 'parent' && 
-          r.related_member?.id === member.id
-        ))
-        .map(m => m.full_name)
-        .filter(Boolean)
-        .join(", ")
-      
-      // For spouses, we look for spouse relationships
-      const spouses = relationships
-        .filter((r: { type: string; related_member: { full_name: string } }) => r.type === 'spouse')
-        .map((r: { type: string; related_member: { full_name: string } }) => r.related_member?.full_name)
-        .filter(Boolean)
-        .join(", ")
-      
-      // For children, we need to find members who have this member as their parent
-      const children = familyMembers
-        .filter(m => m.relationships?.some((r: { type: string; related_member: { id: string } }) => 
-          r.type === 'child' && 
-          r.related_member?.id === member.id
-        ))
-        .map(m => m.full_name)
-        .filter(Boolean)
-        .join(", ")
+    // Process family members data
+    familyMembers.forEach((member: FamilyMember) => {
+      const parents = member.relationships
+        ?.filter(r => r.type === 'parent')
+        .map(r => r.relatedMemberId)
+        .join(', ') || '';
 
-      return {
-        full_name: member.full_name,
-        year_of_birth: member.year_of_birth,
-        living_place: member.living_place,
-        is_deceased: member.is_deceased ? "Yes" : "No",
-        marital_status: member.marital_status,
-        occupation: member.occupation,
+      const spouse = member.relationships
+        ?.find(r => r.type === 'spouse')
+        ?.relatedMemberId || '';
+
+      const children = member.relationships
+        ?.filter(r => r.type === 'child')
+        .map(r => r.relatedMemberId)
+        .join(', ') || '';
+
+      worksheet.addRow({
+        name: member.fullName || member.name,
+        birthYear: member.yearOfBirth || '',
+        deathYear: member.isDeceased ? 'Deceased' : '',
         parents,
-        spouses,
-        children
-      }
-    })
+        spouse,
+        children,
+      });
+    });
 
-    // Add rows
-    console.log('Adding rows to worksheet')
-    worksheet.addRows(processedMembers)
+    // Generate Excel buffer
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    // Style the headers
-    worksheet.getRow(1).font = { bold: true }
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' }
-    }
-
-    // Set content type and filename
-    console.log('Generating Excel buffer')
-    const buffer = await workbook.xlsx.writeBuffer()
-    console.log('Excel buffer size:', buffer.byteLength)
-
-    const headers = {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="family-members-${familyId}.xlsx"`,
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0"
-    }
-
-    console.log('Sending response with Excel file')
-    return new NextResponse(buffer, { headers })
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="family-tree-${familyId}.xlsx"`,
+      },
+    });
   } catch (error) {
-    console.error("Unexpected error in export route:", error)
-    return NextResponse.json({ 
-      error: "Internal Server Error", 
-      details: error instanceof Error ? error.message : "An unexpected error occurred" 
-    }, { status: 500 })
+    console.error('Export error:', error);
+    return new Response(JSON.stringify({ error: 'Export failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

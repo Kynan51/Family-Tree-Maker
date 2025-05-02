@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2, Users } from "lucide-react"
+import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2, Users, Loader2 } from "lucide-react"
 import type { FamilyMember } from "@/lib/types"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
 import { FamilyTreeD3 } from "@/components/family-tree-d3"
@@ -22,11 +22,12 @@ interface FamilyTreeViewProps {
 }
 
 export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeViewProps) {
-  // console.log("familyMembers prop:", familyMembers);
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
   const [isMaximized, setIsMaximized] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isViewLoading, setIsViewLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
@@ -53,17 +54,25 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
     "occupation"
   ]
 
-  // Log the family ID for debugging
-  useEffect(() => {
-    console.log('FamilyTreeView: familyId prop:', familyId);
-  }, [familyId]);
+  const handleViewChange = (newView: "tree" | "timeline") => {
+    setIsViewLoading(true)
+    setView(newView)
+    // Simulate loading time for view change
+    setTimeout(() => {
+      setIsViewLoading(false)
+    }, 500)
+  }
 
   const handleZoomIn = () => {
+    setIsLoading(true)
     setZoom((prev) => Math.min(prev + 0.1, 2))
+    setTimeout(() => setIsLoading(false), 300)
   }
 
   const handleZoomOut = () => {
+    setIsLoading(true)
     setZoom((prev) => Math.max(prev - 0.1, 0.5))
+    setTimeout(() => setIsLoading(false), 300)
   }
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,14 +304,14 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
   return (
     <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[9999] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
       <div className={`flex flex-col sm:flex-row justify-between gap-2 ${isMaximized ? 'p-2' : 'mb-4'}`}>
-        <Tabs value={view} onValueChange={(v) => setView(v as "tree" | "timeline")} className="w-full sm:w-auto">
+        <Tabs value={view} onValueChange={(v) => handleViewChange(v as "tree" | "timeline")} className="w-full sm:w-auto">
           <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="tree" className="flex-1 sm:flex-none">
+            <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
               <GitBranch className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Tree View</span>
               <span className="sm:hidden">Tree</span>
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex-1 sm:flex-none">
+            <TabsTrigger value="timeline" className="flex-1 sm:flex-none" disabled={isViewLoading}>
               <Timeline className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Timeline View</span>
               <span className="sm:hidden">Timeline</span>
@@ -312,12 +321,12 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
 
         <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handleZoomOut}>
-              <ZoomOut className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomOut className="h-4 w-4" />}
             </Button>
             <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
-            <Button variant="outline" size="icon" onClick={handleZoomIn}>
-              <ZoomIn className="h-4 w-4" />
+            <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -337,7 +346,11 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
                 variant="info"
                 className="whitespace-nowrap"
               >
-                <Users className="h-4 w-4 mr-2" />
+                {isDetectingSiblings ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Users className="h-4 w-4 mr-2" />
+                )}
                 <span className="hidden sm:inline">Detect Siblings</span>
                 <span className="sm:hidden">Detect</span>
               </Button>
@@ -383,6 +396,11 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
         ref={containerRef} 
         className={`flex-1 ${isMaximized ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative`}
       >
+        {isViewLoading && (
+          <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
         <Button 
           variant="outline" 
           size="icon" 

@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Loader2 } from "lucide-react"
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -55,9 +56,6 @@ export function EditFamilyMemberDialog({
     );
   }
 
-  console.log("EditFamilyMemberDialog - Initial member data:", member)
-  console.log("EditFamilyMemberDialog - Existing members:", existingMembers)
-
   const [activeTab, setActiveTab] = useState("details")
   const [isLoading, setIsLoading] = useState(true)
   
@@ -67,12 +65,12 @@ export function EditFamilyMemberDialog({
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Filter members to only show those in the same family
   const familyMembers = existingMembers.filter(
     m => (m.familyId === familyId || m.family_id === familyId) && m.id !== member.id
   );
-  console.log("EditFamilyMemberDialog - Filtered family members:", familyMembers)
 
   // Initialize form with member data
   const form = useForm<z.infer<typeof formSchema>>({
@@ -100,7 +98,6 @@ export function EditFamilyMemberDialog({
       setIsLoading(true);
       try {
         const relationships = await getFamilyMemberRelationships(member.id);
-        console.log("EditFamilyMemberDialog - Fetched relationships:", relationships);
         const parentIds = relationships
           .filter(r => r.type === "parent")
           .map(r => r.related_member_id);
@@ -110,7 +107,6 @@ export function EditFamilyMemberDialog({
         setSelectedParents(parentIds);
         setSelectedSpouse(spouseIds);
       } catch (error) {
-        console.error("Error fetching relationships:", error);
         toast({
           title: "Error",
           description: "Failed to load relationships",
@@ -123,14 +119,8 @@ export function EditFamilyMemberDialog({
     fetchRelationships();
   }, [member.id]);
 
-  console.log("EditFamilyMemberDialog - Initial form values:", form.getValues())
-
   // Reset form when member changes
   useEffect(() => {
-    console.log("EditFamilyMemberDialog - Member changed, resetting form")
-    console.log("EditFamilyMemberDialog - New member data:", member)
-    
-    // Reset form values
     form.reset({
       fullName: member.fullName || member.name || member.full_name || "",
       yearOfBirth: member.yearOfBirth || member.year_of_birth,
@@ -143,18 +133,9 @@ export function EditFamilyMemberDialog({
     
     // Set active tab to details when member changes
     setActiveTab("details");
-    
-    console.log("EditFamilyMemberDialog - Form values after reset:", form.getValues())
   }, [member, form])
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log("EditFamilyMemberDialog - Starting form submission")
-    console.log("EditFamilyMemberDialog - Form values:", values)
-    console.log("EditFamilyMemberDialog - Selected relationships:", {
-      parents: selectedParents,
-      spouse: selectedSpouse
-    })
-    
     setIsSubmitting(true)
 
     try {
@@ -177,8 +158,6 @@ export function EditFamilyMemberDialog({
         })
       })
 
-      console.log("EditFamilyMemberDialog - Created relationships array:", relationships)
-
       // Transform form values to match database schema
       const updatedMember: FamilyMember = {
         id: member.id,
@@ -195,26 +174,19 @@ export function EditFamilyMemberDialog({
         createdAt: member.createdAt,
       }
 
-      console.log("EditFamilyMemberDialog - Updated member object:", updatedMember)
-
       // Save to database
-      await updateFamilyMember(updatedMember)
-      console.log("EditFamilyMemberDialog - Successfully saved to database")
+      const { data: savedMember, error } = await updateFamilyMember(updatedMember)
+      if (error) throw error;
 
       // Update local state if callback provided
       if (onUpdate) {
-        onUpdate(updatedMember)
-        console.log("EditFamilyMemberDialog - Called onUpdate callback")
+        onUpdate(savedMember)
       }
 
-      toast({
-        title: "Success",
-        description: "Family member updated successfully",
-      })
+      toast.success("Family member updated successfully")
 
       onOpenChange(false)
     } catch (error) {
-      console.error("EditFamilyMemberDialog - Error updating family member:", error)
       toast({
         title: "Error",
         description: "Failed to update family member",
@@ -227,6 +199,7 @@ export function EditFamilyMemberDialog({
 
   const handleFileUpload = async (file: File) => {
     if (!file) return
+    setIsUploading(true)
 
     const formData = new FormData()
     formData.append("file", file)
@@ -243,12 +216,13 @@ export function EditFamilyMemberDialog({
         form.setValue("photoUrl", data.url)
       }
     } catch (error) {
-      console.error("Error uploading file:", error)
       toast({
         title: "Error",
         description: "Failed to upload image",
         variant: "destructive",
       })
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -285,255 +259,280 @@ export function EditFamilyMemberDialog({
           <DialogTitle>Edit Family Member</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="relationships">Relationships</TabsTrigger>
-          </TabsList>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="relationships">Relationships</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="details" className="py-4">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter full name" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="yearOfBirth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Year of Birth</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="livingPlace"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Living Place</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter living place" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="occupation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Occupation</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter occupation (optional)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="maritalStatus"
-                  render={({ field }) => {
-                    console.log("EditFamilyMemberDialog - Marital status field value:", field.value)
-                    return (
+            <TabsContent value="details" className="py-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Marital Status</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            console.log("EditFamilyMemberDialog - Marital status changed to:", value)
-                            field.onChange(value)
-                          }}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select marital status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Single">Single</SelectItem>
-                            <SelectItem value="Married">Married</SelectItem>
-                            <SelectItem value="Divorced">Divorced</SelectItem>
-                            <SelectItem value="Widowed">Widowed</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter full name" {...field} value={field.value || ""} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
-                    )
-                  }}
-                />
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="isDeceased"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Deceased</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="yearOfBirth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year of Birth</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="photoUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Profile Photo</FormLabel>
-                      <FormControl>
-                        <div
-                          className={cn(
-                            "flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors",
-                            isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-                          )}
-                          onDrop={onDrop}
-                          onDragOver={onDragOver}
-                          onDragLeave={onDragLeave}
-                        >
-                          <div className="relative h-32 w-32">
-                            <img
-                              src={field.value || "/placeholder.svg?height=128&width=128"}
-                              alt="Profile"
-                              className="h-full w-full object-cover rounded-full"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {isDragging ? "Drop your image here" : "Drag and drop an image here, or click to select"}
-                            </p>
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                              className="hidden"
-                              id="profile-photo-upload"
-                            />
-                            <Button
-                              variant="outline"
-                              onClick={() => document.getElementById("profile-photo-upload")?.click()}
-                            >
-                              Select Image
-                            </Button>
-                          </div>
+                  <FormField
+                    control={form.control}
+                    name="livingPlace"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Living Place</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter living place" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="occupation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Occupation</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter occupation (optional)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maritalStatus"
+                    render={({ field }) => {
+                      return (
+                        <FormItem>
+                          <FormLabel>Marital Status</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value)
+                            }}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select marital status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Single">Single</SelectItem>
+                              <SelectItem value="Married">Married</SelectItem>
+                              <SelectItem value="Divorced">Divorced</SelectItem>
+                              <SelectItem value="Widowed">Widowed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isDeceased"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Deceased</FormLabel>
                         </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      </FormItem>
+                    )}
+                  />
 
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
-                    Next
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </TabsContent>
+                  <FormField
+                    control={form.control}
+                    name="photoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Profile Photo</FormLabel>
+                        <FormControl>
+                          <div
+                            className={cn(
+                              "flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors",
+                              isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                            )}
+                            onDrop={onDrop}
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                          >
+                            <div className="relative h-32 w-32">
+                              <img
+                                src={field.value || "/placeholder.svg?height=128&width=128"}
+                                alt="Profile"
+                                className="h-full w-full object-cover rounded-full"
+                              />
+                              {isUploading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-full">
+                                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {isDragging ? "Drop your image here" : "Drag and drop an image here, or click to select"}
+                              </p>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                                className="hidden"
+                                id="profile-photo-upload"
+                                disabled={isUploading}
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => document.getElementById("profile-photo-upload")?.click()}
+                                disabled={isUploading}
+                              >
+                                {isUploading ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Uploading...
+                                  </>
+                                ) : (
+                                  'Select Image'
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          <TabsContent value="relationships" className="py-4">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Parents</h3>
-                <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                  {familyMembers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
-                  ) : (
-                    familyMembers.map((existingMember) => (
-                      <div key={existingMember.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`parent-${existingMember.id}`}
-                          checked={selectedParents.includes(existingMember.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedParents((prev) => [...prev, existingMember.id])
-                            } else {
-                              setSelectedParents((prev) => prev.filter((id) => id !== existingMember.id))
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`parent-${existingMember.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
-                        </label>
-                      </div>
-                    ))
-                  )}
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
+                      Next
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </TabsContent>
+
+            <TabsContent value="relationships" className="py-4">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Parents</h3>
+                  <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
+                    {familyMembers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
+                    ) : (
+                      familyMembers.map((existingMember) => (
+                        <div key={existingMember.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`parent-${existingMember.id}`}
+                            checked={selectedParents.includes(existingMember.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedParents((prev) => [...prev, existingMember.id])
+                              } else {
+                                setSelectedParents((prev) => prev.filter((id) => id !== existingMember.id))
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`parent-${existingMember.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Spouse</h3>
+                  <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
+                    {familyMembers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
+                    ) : (
+                      familyMembers.map((existingMember) => (
+                        <div key={existingMember.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`spouse-${existingMember.id}`}
+                            checked={selectedSpouse.includes(existingMember.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSpouse((prev) => [...prev, existingMember.id])
+                              } else {
+                                setSelectedSpouse((prev) => prev.filter((id) => id !== existingMember.id))
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`spouse-${existingMember.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium mb-2">Spouse</h3>
-                <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                  {familyMembers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
+              <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
+                  Back
+                </Button>
+                <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
                   ) : (
-                    familyMembers.map((existingMember) => (
-                      <div key={existingMember.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`spouse-${existingMember.id}`}
-                          checked={selectedSpouse.includes(existingMember.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedSpouse((prev) => [...prev, existingMember.id])
-                            } else {
-                              setSelectedSpouse((prev) => prev.filter((id) => id !== existingMember.id))
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`spouse-${existingMember.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
-                        </label>
-                      </div>
-                    ))
+                    'Save Changes'
                   )}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="mt-4">
-              <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
-                Back
-              </Button>
-              <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </TabsContent>
-        </Tabs>
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   )

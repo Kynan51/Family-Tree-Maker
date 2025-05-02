@@ -16,9 +16,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Drawer, DrawerContent } from "@/components/ui/drawer"
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { createClient } from "@/lib/supabase/client"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { LoadingLink } from "@/components/ui/loading-link"
+
+// Lazy load the notifications panel
+const NotificationsPanel = lazy(() => import("@/components/notifications-panel"))
 
 interface UserProfile {
   id: string
@@ -31,27 +36,33 @@ interface UserProfile {
 export function Header() {
   const { session, signOut } = useSupabaseAuth();
   const router = useRouter();
-  // console.log("Header session:", session);
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  // Notification state (copied from user-dashboard)
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState(session?.notifications || []);
   const [unreadNotifications, setUnreadNotifications] = useState(notifications.filter(n => !n.read).length);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (session?.user?.id) {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
+        setIsProfileLoading(true);
+        try {
+          const supabase = createClient();
+          const { data, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
 
-        if (!error && data) {
-          setUserProfile(data);
+          if (!error && data) {
+            setUserProfile(data);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        } finally {
+          setIsProfileLoading(false);
         }
       }
     };
@@ -78,7 +89,6 @@ export function Header() {
     }
   };
 
-  // Use session?.user or session directly for authentication
   const isAuthenticated = !!session?.user || !!session;
   const user = session?.user || session;
   const userName = userProfile?.name || user?.name || "User";
@@ -86,12 +96,10 @@ export function Header() {
   const userPhotoUrl = userProfile?.photoUrl || user?.photoUrl || "/placeholder.svg?height=32&width=32";
   const userInitials = userName ? userName.substring(0, 2).toUpperCase() : "U";
 
-  // Check if user is authenticated and has a role
   const userRole = userProfile?.role || user?.role || "viewer"
   const isAdmin = userRole === "admin" || userRole === "super_admin"
   const isSuperAdmin = userRole === "super_admin"
 
-  // Navigation links
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/tree", label: "Tree View" },
@@ -105,29 +113,27 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
+          <LoadingLink href="/" className="flex items-center gap-2" prefetch>
             <Users className="h-6 w-6 text-green-700 dark:text-green-500" />
             <span className="text-xl font-bold hidden sm:inline">Family Tree Maker</span>
-          </Link>
+          </LoadingLink>
 
-          {/* Desktop nav: always show all tabs, disable if not allowed */}
           <nav className="hidden md:flex gap-6">
             {navLinks.map((link) => {
-              // Skip rendering links that user doesn't have access to
               if ((link.admin && !isAdmin) || (link.superAdmin && !isSuperAdmin)) {
                 return null;
               }
               return (
-                <Link
+                <LoadingLink
                   key={link.href}
                   href={link.href}
                   className={`text-sm font-medium transition-colors ${
                     pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}
+                  prefetch
                 >
-                  {link.icon}
                   {link.label}
-                </Link>
+                </LoadingLink>
               );
             })}
           </nav>
@@ -135,7 +141,6 @@ export function Header() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          {/* Notification bell button */}
           <div className="relative">
             <Button
               variant="outline"
@@ -151,38 +156,16 @@ export function Header() {
               )}
             </Button>
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-popover dark:bg-background rounded-md shadow-lg p-4 z-10">
-                <h3 className="font-semibold mb-2">Notifications</h3>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {notifications.length === 0 && <div className="text-sm text-muted-foreground">No notifications</div>}
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-2 rounded-md ${!notification.read ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <p className="text-sm">{notification.message}</p>
-                        {!notification.read && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleMarkNotificationAsRead(notification.id)}
-                          >
-                            Mark as read
-                          </Button>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatDistanceToNow(new Date(notification.timestamp))} ago
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <Suspense fallback={<LoadingSpinner />}>
+                <NotificationsPanel
+                  notifications={notifications}
+                  onMarkAsRead={handleMarkNotificationAsRead}
+                  onClose={() => setShowNotifications(false)}
+                />
+              </Suspense>
             )}
           </div>
 
-          {/* Mobile hamburger menu */}
           {isAuthenticated && (
             <Button
               variant="ghost"
@@ -195,7 +178,6 @@ export function Header() {
             </Button>
           )}
 
-          {/* User menu: show profile avatar if signed in, else sign in button */}
           {isAuthenticated ? (
             <div className="flex items-center gap-4">
               <DropdownMenu>
@@ -203,7 +185,9 @@ export function Header() {
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={userPhotoUrl} alt={userName} />
-                      <AvatarFallback>{userInitials}</AvatarFallback>
+                      <AvatarFallback>
+                        {isProfileLoading ? <LoadingSpinner size="sm" /> : userInitials}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
@@ -237,27 +221,25 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
           <nav className="flex flex-col gap-4 p-6">
             {navLinks.map((link) => {
-              // Skip rendering links that user doesn't have access to
               if ((link.admin && !isAdmin) || (link.superAdmin && !isSuperAdmin)) {
                 return null;
               }
               return (
-                <Link
+                <LoadingLink
                   key={link.href}
                   href={link.href}
                   className={`text-base font-medium transition-colors ${
                     pathname === link.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => setDrawerOpen(false)}
+                  prefetch
                 >
-                  {link.icon}
                   {link.label}
-                </Link>
+                </LoadingLink>
               );
             })}
             <hr className="my-2" />

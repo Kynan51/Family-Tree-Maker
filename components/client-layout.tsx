@@ -1,19 +1,34 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, lazy, Suspense } from "react"
+import { usePathname } from "next/navigation"
 import { Toaster } from "@/components/ui/toaster"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
-import { Header } from "@/components/header"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Footer } from "@/components/footer"
+import { LoadingScreen } from "@/components/ui/loading-screen"
+
+// Lazy load heavy components
+const Header = lazy(() => import("@/components/header").then(mod => ({ default: mod.Header })))
+const Footer = lazy(() => import("@/components/footer").then(mod => ({ default: mod.Footer })))
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    setIsLoading(true)
+    const timeout = setTimeout(() => {
+      setIsLoading(false)
+    }, 500) // Minimum loading time to prevent flickering
+
+    return () => clearTimeout(timeout)
+  }, [pathname])
 
   if (!mounted) {
     return (
@@ -28,13 +43,18 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <ErrorBoundary>
           <div className="min-h-screen flex flex-col bg-background">
-            <Header />
-            <main className="flex-1">
+            <Suspense fallback={<div className="h-14 bg-background/95 backdrop-blur" />}>
+              <Header />
+            </Suspense>
+            <main className="flex-1 relative">
+              {isLoading && <LoadingScreen />}
               <div className="container mx-auto px-4 h-full">
                 {children}
               </div>
             </main>
-            <Footer />
+            <Suspense fallback={<div className="h-16 bg-background" />}>
+              <Footer />
+            </Suspense>
           </div>
           <Toaster />
         </ErrorBoundary>

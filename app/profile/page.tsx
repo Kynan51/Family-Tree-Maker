@@ -7,20 +7,15 @@ import { ClientAuthFallback } from "@/components/client-auth-fallback"
 export default async function ProfilePage() {
   const session = await getServerSession()
 
-  console.log("[ProfilePage] Session:", session);
   if (!session) {
-    // Use client-side fallback for robust auth handling
-    return <ClientAuthFallback />
+    redirect('/login')
   }
 
-  console.log("[ProfilePage] Session user id:", session.user.id);
   const supabase = createAdminClient() // Using admin client for user profile data
   const { data: user, error } = await supabase.from("users").select("*").eq("id", session.user.id).single()
-  console.log("[ProfilePage] Supabase user fetch result:", user, error);
-
+  
   if (error) {
-    console.error("[ProfilePage] Error fetching user:", error)
-    return <div>Error loading profile</div>
+    throw error;
   }
 
   return (

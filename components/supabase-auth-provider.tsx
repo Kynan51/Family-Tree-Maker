@@ -33,9 +33,6 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Debug log on every render
-  // console.log("[SupabaseAuthProvider] Rendered. Session:", session);
-
   const signIn = async (email: string, password: string) => {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({

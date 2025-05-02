@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { createClient } from "@supabase/supabase-js"
 import { createAdminAccess } from "@/lib/actions"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Loader2 } from "lucide-react"
 
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -55,6 +56,7 @@ export function AddFamilyMemberDialog({
   isAdmin = false
 }: AddFamilyMemberDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [relationshipType, setRelationshipType] = useState<'child' | 'parent' | 'spouse'>('child')
   const [activeTab, setActiveTab] = useState("details")
   const [selectedParents, setSelectedParents] = useState<string[]>([])
@@ -76,7 +78,6 @@ export function AddFamilyMemberDialog({
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)
-    // console.log("Form values:", values); // Debug log
 
     try {
       // Validate required fields
@@ -142,8 +143,6 @@ export function AddFamilyMemberDialog({
         }
       }
 
-      // console.log("Creating relationships:", relationships); // Debug log
-
       // Create new family member
       const newMember: FamilyMember = {
         id: uuidv4(),
@@ -162,51 +161,26 @@ export function AddFamilyMemberDialog({
         throw new Error("Full name is required")
       }
 
-      // console.log("New member object before creation:", newMember); // Debug log
-
       // Save to database
-      const createdMember = await createFamilyMember(newMember)
-      // console.log("Created member from server:", createdMember);
-
-      // Transform server response to match client-side type
-      const transformedMember: FamilyMember = {
-        id: createdMember.id,
-        name: createdMember.full_name,
-        fullName: createdMember.full_name,
-        yearOfBirth: createdMember.year_of_birth,
-        livingPlace: createdMember.living_place,
-        isDeceased: createdMember.is_deceased,
-        maritalStatus: createdMember.marital_status,
-        photoUrl: createdMember.photo_url,
-        relationships: newMember.relationships,
-        createdAt: createdMember.created_at,
-        updatedAt: createdMember.updated_at,
-        familyId: createdMember.family_id,
-        isAdmin: values.isAdmin,
-        occupation: values.occupation || "",
-      }
-
-      // console.log("Transformed member for client:", transformedMember); // Debug log
+      const { data: createdMember, error } = await createFamilyMember(newMember)
+      if (error) throw error
 
       // If admin access is requested and member is not deceased, create admin access
       if (values.isAdmin && !values.isDeceased) {
-        await createAdminAccess(transformedMember.id, transformedMember.familyId)
+        await createAdminAccess(createdMember.id, createdMember.family_id)
       }
 
       // Update local state if callback provided
       if (onAdd) {
-        onAdd(transformedMember)
+        onAdd(createdMember)
       }
 
-      toast({
-        title: "Success",
-        description: "Family member added successfully",
-      })
+      toast.success("Family member added successfully")
 
       onOpenChange(false)
     } catch (error) {
       console.error("Error adding family member:", error)
-      console.error("Error details:", { // Debug log
+      console.error("Error details:", {
         values,
         familyId,
         source,
@@ -225,6 +199,7 @@ export function AddFamilyMemberDialog({
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setIsUploading(true)
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -249,6 +224,8 @@ export function AddFamilyMemberDialog({
         description: "Failed to upload image",
         variant: "destructive",
       })
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -417,8 +394,18 @@ export function AddFamilyMemberDialog({
               )}
 
               <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Adding..." : "Add Member"}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Member'
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -639,6 +626,33 @@ export function AddFamilyMemberDialog({
             </TabsContent>
           </Tabs>
         )}
+
+        {/* File upload section */}
+        <div className="mt-4">
+          <FormField
+            control={form.control}
+            name="photoUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Profile Photo</FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                    />
+                    {isUploading && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   )
