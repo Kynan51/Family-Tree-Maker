@@ -99,3 +99,10 @@ body {
 .tree-canvas {
   background-color: hsl(var(--tree-canvas-bg));
 }
+
+.card .card-description {
+  color: #111 !important;
+}
+.dark .card .card-description {
+  color: #f3f4f6 !important;
+}

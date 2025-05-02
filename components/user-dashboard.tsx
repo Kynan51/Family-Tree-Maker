@@ -225,15 +225,15 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
               </div>
               
               {selectedFamily && (
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Privacy Settings:</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Privacy Settings:</span>
                     <PrivacyToggle 
                       familyId={selectedFamily} 
                       initialIsPublic={accessibleFamilies.find(f => f.id === selectedFamily)?.is_public || false} 
                     />
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground dark:text-gray-400">
                     {!accessibleFamilies.find(f => f.id === selectedFamily)?.is_public 
                       ? "Only approved members can view this family tree"
                       : "Anyone can view this family tree"}
@@ -340,13 +340,13 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
   return (
     <div className="mt-[6px] animate-fade-in">
       {/* Tab Navigation */}
-      <div className="bg-gray-100 rounded-lg p-1">
+      <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
         <nav className="flex gap-1">
           <button
             className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
               activeTab === "my-families"
-                ? "bg-white shadow-sm"
-                : "hover:bg-gray-50"
+                ? "bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100"
+                : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
             }`}
             onClick={() => setActiveTab("my-families")}
           >
@@ -355,8 +355,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           <button
             className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
               activeTab === "access-requests"
-                ? "bg-white shadow-sm"
-                : "hover:bg-gray-50"
+                ? "bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100"
+                : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
             }`}
             onClick={() => setActiveTab("access-requests")}
           >
@@ -365,8 +365,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           <button
             className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
               activeTab === "my-members"
-                ? "bg-white shadow-sm"
-                : "hover:bg-gray-50"
+                ? "bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100"
+                : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
             }`}
             onClick={() => setActiveTab("my-members")}
           >
@@ -375,8 +375,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
           <button
             className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
               activeTab === "approval-history"
-                ? "bg-white shadow-sm"
-                : "hover:bg-gray-50"
+                ? "bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100"
+                : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
             }`}
             onClick={() => setActiveTab("approval-history")}
           >
@@ -386,8 +386,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
             <button
               className={`flex-1 px-6 py-2.5 text-sm font-medium text-center rounded-md transition-colors ${
                 activeTab === "admin"
-                  ? "bg-white shadow-sm"
-                  : "hover:bg-gray-50"
+                  ? "bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100"
+                  : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
               }`}
               onClick={() => setActiveTab("admin")}
             >

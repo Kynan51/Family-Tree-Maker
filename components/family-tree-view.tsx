@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2 } from "lucide-react"
+import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2, Users } from "lucide-react"
 import type { FamilyMember } from "@/lib/types"
 import { AddFamilyMemberDialog } from "@/components/add-family-member-dialog"
 import { FamilyTreeD3 } from "@/components/family-tree-d3"
@@ -13,6 +13,7 @@ import { ShareButton } from "@/components/share-button"
 import * as XLSX from "xlsx"
 import { createFamilyMember, updateFamilyMember } from "@/lib/actions"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { toast } from "@/components/ui/use-toast"
 
 interface FamilyTreeViewProps {
   familyMembers: FamilyMember[]
@@ -29,6 +30,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
   const containerRef = useRef<HTMLDivElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
+  const [isDetectingSiblings, setIsDetectingSiblings] = useState(false)
   // Default required columns match export logic
   const defaultColumns = [
     "full_name",
@@ -256,6 +258,40 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
     setIsMaximized(!isMaximized)
   }
 
+  const handleDetectSiblings = async () => {
+    try {
+      setIsDetectingSiblings(true)
+      const response = await fetch('/api/detect-siblings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ familyId }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to detect siblings')
+      }
+
+      toast({
+        title: "Success",
+        description: "Siblings detected and default parents created",
+      })
+
+      // Refresh the page to show the updated tree
+      window.location.reload()
+    } catch (error) {
+      console.error('Error detecting siblings:', error)
+      toast({
+        title: "Error",
+        description: "Failed to detect siblings",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDetectingSiblings(false)
+    }
+  }
+
   return (
     <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[9999] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
       <div className={`flex flex-col sm:flex-row justify-between gap-2 ${isMaximized ? 'p-2' : 'mb-4'}`}>
@@ -294,6 +330,15 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
                 <Plus className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Add Member</span>
                 <span className="sm:hidden">Add</span>
+              </Button>
+              <Button 
+                onClick={handleDetectSiblings} 
+                disabled={isDetectingSiblings}
+                className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Detect Siblings</span>
+                <span className="sm:hidden">Detect</span>
               </Button>
               <label htmlFor="import-excel" className="whitespace-nowrap">
                 <input

@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx'
 export async function GET(request: Request) {
   console.log('Export API called')
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
     
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
