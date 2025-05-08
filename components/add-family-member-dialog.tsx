@@ -32,6 +32,7 @@ const formSchema = z.object({
   photoUrl: z.string().optional(),
   isAdmin: z.boolean().default(false),
   occupation: z.string().optional(),
+  gender: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
 })
 
 interface AddFamilyMemberDialogProps {
@@ -73,6 +74,7 @@ export function AddFamilyMemberDialog({
       photoUrl: "",
       isAdmin: false,
       occupation: undefined,
+      gender: "unknown",
     },
   })
 
@@ -328,6 +330,32 @@ export function AddFamilyMemberDialog({
               <div className="space-y-2">
                 <FormField
                   control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="unknown">Unknown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
                   name="maritalStatus"
                   render={({ field }) => (
                     <FormItem>
@@ -478,6 +506,32 @@ export function AddFamilyMemberDialog({
                           <FormControl>
                             <Input placeholder="Enter occupation (optional)" {...field} />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Gender</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                              <SelectItem value="unknown">Unknown</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}

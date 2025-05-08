@@ -67,6 +67,7 @@ export function FamilyTree({ members }: FamilyTreeProps) {
                             {member.yearOfBirth} - {member.isDeceased ? "Deceased" : "Present"}
                           </p>
                           <p className="text-sm text-gray-500">{member.livingPlace}</p>
+                          <p className="text-sm text-gray-500">Gender: {member.gender ? member.gender.charAt(0).toUpperCase() + member.gender.slice(1) : 'Unknown'}</p>
                         </div>
                         <div className="flex gap-2">
                           <Button
@@ -134,4 +135,4 @@ export function FamilyTree({ members }: FamilyTreeProps) {
       )}
     </div>
   )
-} 
+}

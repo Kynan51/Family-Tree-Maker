@@ -34,17 +34,20 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
   const [isMobile, setIsMobile] = useState(false)
   const [membersState, setMembersState] = useState<FamilyMember[]>(() => 
     accessibleFamilies.flatMap(family => 
-      (family.members || []).map(member => ({
-        ...member,
-        name: member.full_name,
-        familyName: family.name,
-        familyId: family.id,
-        yearOfBirth: member.year_of_birth,
-        livingPlace: member.living_place,
-        occupation: member.occupation,
-        isDeceased: member.is_deceased,
-        relationships: member.relationships || []
-      }))
+      (family.members || [])
+        .filter(member => member && typeof member === 'object' && (member.id || member.member_id || member._id))
+        .map(member => ({
+          ...member,
+          id: member.id || member.member_id || member._id || Math.random().toString(36),
+          name: member.full_name,
+          familyName: family.name,
+          familyId: family.id,
+          yearOfBirth: member.year_of_birth,
+          livingPlace: member.living_place,
+          occupation: member.occupation,
+          isDeceased: member.is_deceased,
+          relationships: member.relationships || []
+        }))
     )
   )
 
@@ -73,17 +76,20 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
 
   // Get all members from accessible families
   const allFamilyMembers = accessibleFamilies.flatMap(family => 
-    (family.members || []).map(member => ({
-      ...member,
-      name: member.full_name,
-      familyName: family.name,
-      familyId: family.id,
-      yearOfBirth: member.year_of_birth,
-      livingPlace: member.living_place,
-      occupation: member.occupation,
-      isDeceased: member.is_deceased,
-      relationships: member.relationships || []
-    }))
+    (family.members || [])
+      .filter(member => member && typeof member === 'object' && (member.id || member.member_id || member._id))
+      .map(member => ({
+        ...member,
+        id: member.id || member.member_id || member._id || Math.random().toString(36),
+        name: member.full_name,
+        familyName: family.name,
+        familyId: family.id,
+        yearOfBirth: member.year_of_birth,
+        livingPlace: member.living_place,
+        occupation: member.occupation,
+        isDeceased: member.is_deceased,
+        relationships: member.relationships || []
+      }))
   );
 
   // Get all members from families where user is admin
@@ -98,17 +104,20 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
       )
     )
     .flatMap(family => 
-      (family.members || []).map(member => ({
-        ...member,
-        name: member.full_name,
-        familyName: family.name,
-        familyId: family.id,
-        yearOfBirth: member.year_of_birth,
-        livingPlace: member.living_place,
-        occupation: member.occupation,
-        isDeceased: member.is_deceased,
-        relationships: member.relationships || []
-      }))
+      (family.members || [])
+        .filter(member => member && typeof member === 'object' && (member.id || member.member_id || member._id))
+        .map(member => ({
+          ...member,
+          id: member.id || member.member_id || member._id || Math.random().toString(36),
+          name: member.full_name,
+          familyName: family.name,
+          familyId: family.id,
+          yearOfBirth: member.year_of_birth,
+          livingPlace: member.living_place,
+          occupation: member.occupation,
+          isDeceased: member.is_deceased,
+          relationships: member.relationships || []
+        }))
     );
 
   // Filter members based on selected family and search query
@@ -127,7 +136,8 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
     });
 
   const handleUpdateMember = (updatedMember: FamilyMember) => {
-    setMembersState(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m))
+    console.log('DEBUG: Updated member object in onUpdate:', updatedMember);
+    setMembersState(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
   }
 
   const handleDeleteMember = (id: string) => {
@@ -490,7 +500,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
         href: "/dashboard/members",
         showActions: true,
         actions: filteredMembers.map(member => ({
-          id: member.id,
+          id: member.id || member.member_id || member._id || Math.random().toString(36),
           name: member.name,
           familyName: member.familyName,
           yearOfBirth: member.yearOfBirth,
@@ -517,7 +527,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
         href: "/dashboard/admin",
         showActions: true,
         actions: filteredMembers.map(member => ({
-          id: member.id,
+          id: member.id || member.member_id || member._id || Math.random().toString(36),
           name: member.name,
           familyName: member.familyName,
           yearOfBirth: member.yearOfBirth,
@@ -551,7 +561,7 @@ export function UserDashboard({ userId, accessibleFamilies, accessRequests }: Us
               {card.showActions && card.actions && card.actions.length > 0 && (
                 <div className="mt-4 space-y-2">
                   {card.actions.map((action) => (
-                    <div key={action.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                    <div key={action.id || action.familyName || Math.random()} className="flex items-center justify-between p-2 bg-muted rounded-md">
                       <div className="flex-1">
                         <p className="text-sm font-medium">{action.name || action.familyName}</p>
                         {action.requestedBy && (

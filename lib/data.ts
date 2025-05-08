@@ -47,7 +47,8 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
-        occupation: member.occupation
+        occupation: member.occupation,
+        gender: member.gender || 'unknown',
       }))
     }
 
@@ -74,7 +75,8 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
-        occupation: member.occupation
+        occupation: member.occupation,
+        gender: member.gender || 'unknown',
       }
     })
   } catch (error) {
@@ -116,7 +118,8 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
         createdAt: member.created_at,
         updatedAt: member.updated_at,
         familyId: member.family_id,
-        occupation: member.occupation
+        occupation: member.occupation,
+        gender: member.gender || 'unknown',
       }
     }
 
@@ -141,7 +144,8 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
       createdAt: member.created_at,
       updatedAt: member.updated_at,
       familyId: member.family_id,
-      occupation: member.occupation
+      occupation: member.occupation,
+      gender: member.gender || 'unknown',
     }
   } catch (error) {
     console.error("Error in getFamilyMemberById:", error)

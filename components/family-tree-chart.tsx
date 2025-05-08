@@ -12,6 +12,7 @@ interface FamilyMember {
   isDeceased: boolean
   occupation?: string
   maritalStatus?: string
+  gender?: string
   children?: FamilyMember[]
 }
 
@@ -33,6 +34,7 @@ function MemberCard({ member }: { member: FamilyMember }) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
           </div>
           <span className="font-medium text-center text-sm">{member.fullName}</span>
+          <span className="text-xs text-gray-500 mt-1">Gender: {member.gender ? member.gender.charAt(0).toUpperCase() + member.gender.slice(1) : 'Unknown'}</span>
         </CardContent>
       </Card>
       {/* Enhanced tooltip for details */}
@@ -51,6 +53,10 @@ function MemberCard({ member }: { member: FamilyMember }) {
             <div className="flex justify-between">
               <span className="font-medium">Living Place:</span>
               <span className="text-right">{member.livingPlace}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium">Gender:</span>
+              <span className="text-right">{member.gender ? member.gender.charAt(0).toUpperCase() + member.gender.slice(1) : 'Unknown'}</span>
             </div>
             {member.occupation && (
               <div className="flex justify-between">
@@ -112,4 +118,4 @@ export function FamilyTreeChart({ members }: FamilyTreeChartProps) {
 // Add a simple fade-in animation for tooltip
 // Add this to your global CSS if not present:
 // .animate-fade-in { animation: fadeIn 0.2s ease; }
-// @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } 
+// @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

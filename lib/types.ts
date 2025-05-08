@@ -11,6 +11,7 @@ export interface FamilyMember {
     type: string
     relatedMemberId: string
   }>
+  gender: "male" | "female" | "other" | "unknown"
   createdAt: string
   updatedAt: string
   familyId: string

@@ -33,6 +33,9 @@ function Tooltip({ person }: { person: any }) {
       <div className="text-sm">
         <div className="font-medium text-gray-900 dark:text-white">{person.name}</div>
         <div className="text-gray-500 dark:text-gray-300">{person.relation}</div>
+        {person.gender && (
+          <div className="text-gray-500 dark:text-gray-300">Gender: {person.gender.charAt(0).toUpperCase() + person.gender.slice(1)}</div>
+        )}
         {person.yearOfBirth && (
           <div className="text-gray-500 dark:text-gray-300">Born: {person.yearOfBirth}</div>
         )}
@@ -207,7 +210,8 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
         livingPlace: nodeDatum.attributes.livingPlace,
         occupation: nodeDatum.attributes.occupation,
         isDeceased: nodeDatum.attributes.isDeceased,
-        relation: nodeDatum.attributes.relation
+        relation: nodeDatum.attributes.relation,
+        gender: nodeDatum.raw?.gender || 'unknown',
       })}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}
@@ -217,7 +221,8 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
         livingPlace: nodeDatum.attributes.livingPlace,
         occupation: nodeDatum.attributes.occupation,
         isDeceased: nodeDatum.attributes.isDeceased,
-        relation: nodeDatum.attributes.relation
+        relation: nodeDatum.attributes.relation,
+        gender: nodeDatum.raw?.gender || 'unknown',
       })}
     >
       <Card className="flex flex-col items-center justify-between shadow-sm p-2 rounded-lg w-[160px] h-[140px]">
@@ -226,6 +231,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
           </div>
           <span className="font-medium text-center text-sm truncate w-full" title={nodeDatum.name}>{nodeDatum.name}</span>
+          <span className="text-xs text-muted-foreground truncate w-full text-center" title={nodeDatum.raw?.gender || 'unknown'}>
+            {nodeDatum.raw?.gender?.charAt(0).toUpperCase() + nodeDatum.raw?.gender?.slice(1) || 'Unknown'}
+          </span>
           <span className="text-xs text-muted-foreground truncate w-full text-center" title={nodeDatum.attributes.relation}>{nodeDatum.attributes.relation}</span>
         </div>
         {isAdmin && (
@@ -242,7 +250,15 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   const leftPartnerCards = leftPartners.map((partner: any, idx: number) => (
     <div
       key={`partner-left-${idx}`}
-      onMouseEnter={e => handleMouseEnter(e, partner)}
+      onMouseEnter={e => handleMouseEnter(e, {
+        name: partner.name,
+        yearOfBirth: partner.yearOfBirth,
+        livingPlace: partner.livingPlace,
+        occupation: partner.occupation,
+        isDeceased: partner.isDeceased,
+        relation: partner.relation,
+        gender: partner.gender ? partner.gender : 'unknown',
+      })}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', alignItems: 'center' }}
       data-tooltip={JSON.stringify(partner)}
@@ -253,6 +269,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
           </div>
           <span className="font-medium text-center text-sm truncate w-full" title={partner.name}>{partner.name}</span>
+          <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.gender || 'unknown'}>
+            {partner.gender?.charAt(0).toUpperCase() + partner.gender?.slice(1) || 'Unknown'}
+          </span>
           <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.relation}>{partner.relation}</span>
         </div>
       </Card>
@@ -264,7 +283,15 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   const rightPartnerCards = rightPartners.map((partner: any, idx: number) => (
     <div
       key={`partner-right-${idx}`}
-      onMouseEnter={e => handleMouseEnter(e, partner)}
+      onMouseEnter={e => handleMouseEnter(e, {
+        name: partner.name,
+        yearOfBirth: partner.yearOfBirth,
+        livingPlace: partner.livingPlace,
+        occupation: partner.occupation,
+        isDeceased: partner.isDeceased,
+        relation: partner.relation,
+        gender: partner.gender ? partner.gender : 'unknown',
+      })}
       onMouseLeave={handleMouseLeave}
       style={{ display: 'flex', alignItems: 'center' }}
       data-tooltip={JSON.stringify(partner)}
@@ -276,6 +303,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
           </div>
           <span className="font-medium text-center text-sm truncate w-full" title={partner.name}>{partner.name}</span>
+          <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.gender || 'unknown'}>
+            {partner.gender?.charAt(0).toUpperCase() + partner.gender?.slice(1) || 'Unknown'}
+          </span>
           <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.relation}>{partner.relation}</span>
         </div>
       </Card>
@@ -334,6 +364,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
           </div>
           {tooltipData.relation && (
             <div className="text-muted-foreground text-xs">Marital Status: {tooltipData.relation}</div>
+          )}
+          {tooltipData.gender && (
+            <div className="text-muted-foreground text-xs">Gender: {tooltipData.gender.charAt(0).toUpperCase() + tooltipData.gender.slice(1)}</div>
           )}
         </div>,
         document.body
@@ -614,6 +647,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
         familyId: selectedMember.familyId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        gender: newMember.gender,
         relationships: [
           {
             type: 'child' as const,
@@ -667,7 +701,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
           <p className="mb-6 text-center text-muted-foreground">Add the first (oldest) person to begin your family tree.</p>
           <form onSubmit={e => {
             e.preventDefault();
-            const newId = Math.random().toString(36).slice(2)
+            const newId = Math.random().toString(36).slice(2);
             const newMember = {
               id: newId,
               fullName: form.fullName,
@@ -676,12 +710,13 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
               isDeceased: form.isDeceased === 'true',
               maritalStatus: form.maritalStatus,
               occupation: form.occupation,
+              gender: 'unknown',
               relationships: [],
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               familyId: '', // can be set if needed
-            }
-            setMembersState([newMember])
+            };
+            setMembersState([newMember]);
             setForm({
               fullName: '',
               yearOfBirth: '',
@@ -689,7 +724,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
               maritalStatus: 'Single',
               occupation: '',
               isDeceased: 'false',
-            })
+            });
           }}>
             <div className="mb-3">
               <label className="block mb-1 font-medium text-foreground">Full Name</label>
@@ -772,92 +807,38 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
   }
 
   return (
-    <div className="relative w-full h-full" ref={svgRef}>
-      <TreeComponent
-        data={treeData}
-        translate={translate}
-        orientation="vertical"
-        renderCustomNodeElement={(rd3tProps) => (
-          <CustomNode
-            {...rd3tProps}
-            isAdmin={isAdmin}
-            onAdd={handleAddMemberClick}
-          />
-        )}
-        pathFunc={(linkData) => {
-          const { source, target } = linkData;
-          
-          // Calculate connection points from the center of cards
-          const sourceX = source.x;
-          const sourceY = source.y + 70; // Bottom of parent card
-          const targetX = target.x;
-          const targetY = target.y - 70; // Top of child card
-          
-          // Calculate control points for the curve
-          const midY = sourceY + (targetY - sourceY) / 2;
-          
-          // Create a smooth curved path using cubic bezier
-          return `
-            M ${sourceX} ${sourceY}
-            C ${sourceX} ${sourceY + 20},
-              ${sourceX} ${midY - 20},
-              ${sourceX} ${midY}
-            L ${targetX} ${midY}
-            C ${targetX} ${midY + 20},
-              ${targetX} ${targetY - 20},
-              ${targetX} ${targetY}
-          `.trim();
-        }}
-        zoomable={true}
-        collapsible={false}
-        nodeSize={{ x: 220, y: 200 }}
-        separation={{ siblings: 1.5, nonSiblings: 2 }}
-        enableLegacyTransitions={true}
-        pathClassFunc={() => isDark ? "link-dark" : "link-light"}
-        onUpdate={(target: { node: TreeNodeDatum | null; zoom: number; translate: Point }) => {
-          if (target.node) {
-            handleTreeUpdate(treeData, [target.node])
-          }
-        }}
-      />
-      <style jsx global>{`
-        .link-dark {
-          stroke: #bbb;
-          stroke-width: 2;
-        }
-        .link-light {
-          stroke: #888;
-          stroke-width: 2;
-        }
-      `}</style>
-      <div ref={overlayRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 20 }}>
-        {renderOverlay()}
+    <div className="relative">
+      <div ref={svgRef} className="relative">
+        <TreeComponent
+          data={treeData}
+          translate={translate}
+          orientation="vertical"
+          pathFunc="step"
+          collapsible={false}
+          zoomable={true}
+          scaleExtent={{ min: 0.1, max: 2 }}
+          nodeSize={{ x: 200, y: 200 }}
+          separation={{ siblings: 1, nonSiblings: 1 }}
+          renderCustomNodeElement={(rd3tProps) => (
+            <CustomNode
+              {...rd3tProps}
+              onAdd={handleAddMemberClick}
+              isAdmin={isAdmin}
+            />
+          )}
+          onUpdate={handleTreeUpdate}
+        />
       </div>
-
-      {/* Add Member Dialog */}
-      {showAddDialog && selectedMember && (
+      <SiblingConnectorOverlay nodePositions={nodePositions} membersState={membersState} />
+      {renderOverlay()}
+      {showAddDialog && (
         <AddFamilyMemberDialog
-          open={showAddDialog}
-          onOpenChange={(open) => {
-            setShowAddDialog(open)
-            if (!open) setSelectedMember(null)
-          }}
-          existingMembers={membersState}
-          onAdd={(member: LibFamilyMember) => {
-            const memberWithGeneration: FamilyMember = {
-              ...member,
-              generation: selectedMember.generation + 1,
-              partner: undefined,
-              partners: [],
-              children: []
-            };
-            handleAddMember(memberWithGeneration);
-          }}
-          source="card"
-          selectedMember={selectedMember}
-          familyId={selectedMember.familyId}
+          isOpen={showAddDialog}
+          onClose={() => setShowAddDialog(false)}
+          onSubmit={handleAddMember}
+          parentMember={selectedMember}
         />
       )}
     </div>
   )
-} 
+}

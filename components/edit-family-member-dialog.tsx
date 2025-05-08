@@ -29,6 +29,7 @@ const formSchema = z.object({
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
   photoUrl: z.string().optional(),
   occupation: z.string().optional(),
+  gender: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
 })
 
 interface EditFamilyMemberDialogProps {
@@ -48,6 +49,8 @@ export function EditFamilyMemberDialog({
   onUpdate,
   familyId,
 }: EditFamilyMemberDialogProps) {
+  console.log('DEBUG: EditFamilyMemberDialog rendered', { open, member, familyId });
+
   if (!familyId) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
@@ -83,6 +86,7 @@ export function EditFamilyMemberDialog({
       maritalStatus: member.maritalStatus || member.marital_status || "Single",
       photoUrl: member.photoUrl || member.photo_url || "",
       occupation: member.occupation || "",
+      gender: member.gender || "unknown",
     },
   })
 
@@ -129,7 +133,8 @@ export function EditFamilyMemberDialog({
       maritalStatus: member.maritalStatus || member.marital_status || "Single",
       photoUrl: member.photoUrl || member.photo_url || "",
       occupation: member.occupation || "",
-    })
+      gender: member.gender || "unknown",
+    });
     
     // Set active tab to details when member changes
     setActiveTab("details");
@@ -172,21 +177,45 @@ export function EditFamilyMemberDialog({
         updatedAt: new Date().toISOString(),
         familyId: member.familyId,
         createdAt: member.createdAt,
+        gender: values.gender,
       }
 
       // Save to database
-      const { data: savedMember, error } = await updateFamilyMember(updatedMember)
-      if (error) throw error;
-
-      // Update local state if callback provided
-      if (onUpdate) {
-        onUpdate(savedMember)
+      const savedMember = await updateFamilyMember(updatedMember);
+      if (onUpdate && savedMember) {
+        console.log('DEBUG: Calling onUpdate with:', savedMember);
+        onUpdate({
+          id: savedMember.id,
+          fullName: savedMember.full_name,
+          yearOfBirth: savedMember.year_of_birth,
+          livingPlace: savedMember.living_place,
+          isDeceased: savedMember.is_deceased,
+          maritalStatus: savedMember.marital_status,
+          photoUrl: savedMember.photo_url,
+          occupation: savedMember.occupation,
+          relationships: savedMember.relationships || [],
+          updatedAt: savedMember.updated_at,
+          createdAt: savedMember.created_at,
+          familyId: savedMember.family_id,
+          gender: savedMember.gender || 'unknown',
+        });
       }
 
-      toast.success("Family member updated successfully")
+      // Show success message
+      if (typeof toast.success === 'function') {
+        toast.success("Family member updated successfully");
+      } else {
+        toast({
+          title: "Success",
+          description: "Family member updated successfully",
+          variant: "success",
+        });
+      }
 
+      // Close the dialog after successful update
       onOpenChange(false)
     } catch (error) {
+      console.error('DEBUG: Error in onSubmit:', error);
       toast({
         title: "Error",
         description: "Failed to update family member",
@@ -436,6 +465,30 @@ export function EditFamilyMemberDialog({
                             </div>
                           </div>
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gender</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="unknown">Unknown</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

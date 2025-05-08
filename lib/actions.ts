@@ -56,7 +56,8 @@ export async function createFamilyMember(member: FamilyMember) {
       created_at: member.createdAt,
       updated_at: member.updatedAt,
       family_id: member.familyId,
-      occupation: member.occupation || null
+      occupation: member.occupation || null,
+      gender: member.gender || 'unknown',
     }
 
     // console.log("Inserting new member:", JSON.stringify(memberWithoutRelationships, null, 2))
@@ -147,7 +148,8 @@ export async function updateFamilyMember(member: FamilyMember) {
     photo_url: member.photoUrl,
     occupation: member.occupation,
     updated_at: member.updatedAt,
-    family_id: member.familyId
+    family_id: member.familyId,
+    gender: member.gender || 'unknown',
   }
 
   // First, get the current member data to compare changes

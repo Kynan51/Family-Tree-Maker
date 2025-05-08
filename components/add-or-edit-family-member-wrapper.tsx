@@ -12,6 +12,8 @@ const families = [
 
 export function AddOrEditFamilyMemberWrapper(props) {
   const [isLoading, setIsLoading] = useState(true);
+  const initialFamilyId = props.initialFamilyId || "";
+  const [selectedFamilyId, setSelectedFamilyId] = useState(initialFamilyId);
 
   useEffect(() => {
     // Simulate data loading or replace with actual data fetching logic
@@ -20,9 +22,12 @@ export function AddOrEditFamilyMemberWrapper(props) {
       // Example: await fetchFamilies();
       setTimeout(() => setIsLoading(false), 1000); // Replace with real data loading
     };
-
     fetchData();
   }, [props.accessibleFamilies, props.allMembers]);
+
+  useEffect(() => {
+    setSelectedFamilyId(initialFamilyId);
+  }, [initialFamilyId]);
 
   if (isLoading) {
     return (
@@ -38,15 +43,6 @@ export function AddOrEditFamilyMemberWrapper(props) {
       fam.created_by === props.userId ||
       fam.admins?.some(admin => admin.user_id === props.userId)
   ) || [];
-
-  // Accept an optional initialFamilyId prop for pre-selection
-  const initialFamilyId = props.initialFamilyId || "";
-  const [selectedFamilyId, setSelectedFamilyId] = useState(initialFamilyId);
-
-  // If initialFamilyId changes (e.g., user filters in dashboard), update selection
-  useEffect(() => {
-    setSelectedFamilyId(initialFamilyId);
-  }, [initialFamilyId]);
 
   // Filter members for the selected family
   const familyMembers = props.allMembers?.filter(
