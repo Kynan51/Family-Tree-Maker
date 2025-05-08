@@ -19,12 +19,15 @@ interface FamilyTreeViewProps {
   familyMembers: FamilyMember[]
   isAdmin: boolean
   familyId: string
+  isMaximizedProp?: boolean
+  setIsMaximizedProp?: (v: boolean) => void
 }
 
-export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeViewProps) {
+export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedProp, setIsMaximizedProp }: FamilyTreeViewProps) {
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
-  const [isMaximized, setIsMaximized] = useState(false)
+  const isMaximized = !!isMaximizedProp;
+  const setIsMaximized = setIsMaximizedProp!;
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isViewLoading, setIsViewLoading] = useState(false)
@@ -264,7 +267,12 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
   }
 
   const toggleMaximize = () => {
-    setIsMaximized(!isMaximized)
+    console.log('DEBUG: Maximize button clicked. Current isMaximized:', isMaximized);
+    setIsMaximized((prev: boolean) => {
+      const next = !prev;
+      console.log('DEBUG: Setting isMaximized to', next);
+      return next;
+    });
   }
 
   const handleDetectSiblings = async () => {
@@ -302,8 +310,9 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
   }
 
   return (
-    <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[9999] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
-      <div className={`flex flex-col sm:flex-row justify-between gap-2 ${isMaximized ? 'p-2' : 'mb-4'}`}>
+    <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[30] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
+      {/* Control bar at the top, no extra header */}
+      <div className={`flex flex-col sm:flex-row justify-between gap-2 items-center ${isMaximized ? 'p-2' : 'mb-4'} z-40 pointer-events-auto w-full`}>
         <Tabs value={view} onValueChange={(v) => handleViewChange(v as "tree" | "timeline")} className="w-full sm:w-auto">
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
@@ -318,7 +327,6 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
             </TabsTrigger>
           </TabsList>
         </Tabs>
-
         <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
@@ -329,10 +337,8 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
             </Button>
           </div>
-
           <ExportButton familyId={familyId} />
           <ShareButton familyId={familyId} familyName={familyMembers[0]?.familyName || "Family Tree"} />
-
           {isAdmin && (
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">
@@ -376,25 +382,10 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
           )}
         </div>
       </div>
-
-      {(importError || importSuccess) && (
-        <div className="mb-4">
-          {importError && (
-            <div className="text-red-600 text-sm whitespace-pre-line">
-              {importError}
-            </div>
-          )}
-          {importSuccess && (
-            <div className="text-green-600 text-sm whitespace-pre-line">
-              {importSuccess}
-            </div>
-          )}
-        </div>
-      )}
-
       <div 
         ref={containerRef} 
-        className={`flex-1 ${isMaximized ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative`}
+        className={`flex-1 ${isMaximized ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative z-20 ${isMaximized ? 'pointer-events-auto' : ''}`}
+        style={{ pointerEvents: isMaximized ? 'auto' : undefined }}
       >
         {isViewLoading && (
           <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
@@ -404,7 +395,10 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
         <Button 
           variant="outline" 
           size="icon" 
-          onClick={toggleMaximize}
+          onClick={() => {
+            console.log('DEBUG: Maximize button onClick');
+            toggleMaximize();
+          }}
           className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"
         >
           {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -418,22 +412,16 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
           }}
         >
           {view === "tree" ? (
-            <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} familyId={familyId} />
+            familyMembers && familyMembers.length > 0 ? (
+              <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} familyId={familyId} />
+            ) : (
+              <div className="flex items-center justify-center h-full w-full text-lg text-muted-foreground">No family tree available</div>
+            )
           ) : (
             <TimelineChart familyMembers={familyMembers} />
           )}
         </div>
       </div>
-
-      <AddFamilyMemberDialog 
-        open={showAddDialog} 
-        onOpenChange={(open) => {
-          console.log("DEBUG: onOpenChange called with:", open);
-          setShowAddDialog(open);
-        }} 
-        existingMembers={familyMembers} 
-        familyId={familyId} 
-      />
     </div>
   )
 }

@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase/server"
 import { ClientAuthFallback } from "@/components/client-auth-fallback"
 import type { FamilyAccess } from "@/lib/types"
 import Link from "next/link"
-import { useState } from "react"
 import { FamilyTreeRootMemberForm } from "@/components/family-tree-root-member-form"
 import { ShareButton } from "@/components/share-button"
+import FamilyTreeClientPage from "@/components/family-tree-client-page";
 
 export default async function FamilyTreePage(props: { params: { familyId: string } } | { params: Promise<{ familyId: string }> }) {
   let params = props.params as any;
@@ -171,11 +171,10 @@ export default async function FamilyTreePage(props: { params: { familyId: string
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">{family.name}</h1>
-      {/* Render only the FamilyTreeView, which handles all buttons and dialogs */}
-      <FamilyTreeView 
-        familyMembers={transformedMembers} 
-        isAdmin={isAdmin} 
+      <FamilyTreeClientPage
+        family={family}
+        familyMembers={transformedMembers}
+        isAdmin={isAdmin}
         familyId={familyId}
       />
     </div>

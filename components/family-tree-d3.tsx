@@ -322,7 +322,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   const totalWidth = totalCards * cardWidth + plusSigns * plusWidth;
 
   // Adjust the z-index of the tooltip to ensure it is below the dialog
-  const tooltipZIndex = 9; // Further reduce the z-index to ensure it is below the dialog
+  const tooltipZIndex = 90; // Further reduce the z-index to ensure it is below the dialog
 
   return (
     <g>
