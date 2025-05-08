@@ -425,9 +425,15 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId }: FamilyTreeV
         </div>
       </div>
 
-      {isAdmin && showAddDialog && (
-        <AddFamilyMemberDialog open={showAddDialog} onOpenChange={setShowAddDialog} existingMembers={familyMembers} familyId={familyId} />
-      )}
+      <AddFamilyMemberDialog 
+        open={showAddDialog} 
+        onOpenChange={(open) => {
+          console.log("DEBUG: onOpenChange called with:", open);
+          setShowAddDialog(open);
+        }} 
+        existingMembers={familyMembers} 
+        familyId={familyId} 
+      />
     </div>
   )
 }

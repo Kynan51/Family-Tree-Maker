@@ -30,6 +30,7 @@ const formSchema = z.object({
   photoUrl: z.string().optional(),
   occupation: z.string().optional(),
   gender: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
+  yearOfDeath: z.coerce.number().int().min(1000).max(new Date().getFullYear()).nullable().optional(),
 })
 
 interface EditFamilyMemberDialogProps {
@@ -79,14 +80,15 @@ export function EditFamilyMemberDialog({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: member.fullName || member.name || member.full_name || "",
-      yearOfBirth: member.yearOfBirth || member.year_of_birth,
-      livingPlace: member.livingPlace || member.living_place,
+      fullName: member.fullName || member.name || member.full_name || "", // Ensure full_name is mapped
+      yearOfBirth: member.yearOfBirth || member.year_of_birth || "",
+      livingPlace: member.livingPlace || member.living_place || "",
       isDeceased: member.isDeceased || member.is_deceased || false,
       maritalStatus: member.maritalStatus || member.marital_status || "Single",
       photoUrl: member.photoUrl || member.photo_url || "",
       occupation: member.occupation || "",
       gender: member.gender || "unknown",
+      yearOfDeath: member.yearOfDeath || member.year_of_death || "", // Prefill yearOfDeath
     },
   })
 
@@ -134,11 +136,30 @@ export function EditFamilyMemberDialog({
       photoUrl: member.photoUrl || member.photo_url || "",
       occupation: member.occupation || "",
       gender: member.gender || "unknown",
+      yearOfDeath: member.yearOfDeath || member.year_of_death || null,
     });
     
     // Set active tab to details when member changes
     setActiveTab("details");
   }, [member, form])
+
+  useEffect(() => {
+    // Prefill form with member data
+    form.reset({
+      fullName: member.fullName || member.name || member.full_name || "",
+      yearOfBirth: member.yearOfBirth || new Date().getFullYear(),
+      livingPlace: member.livingPlace || "",
+      isDeceased: member.isDeceased || false,
+      maritalStatus: member.maritalStatus || "Single",
+      photoUrl: member.photoUrl || "",
+      occupation: member.occupation || "",
+      gender: member.gender || "unknown",
+      yearOfDeath: member.yearOfDeath || null,
+    });
+
+    // Set active tab to details when member changes
+    setActiveTab("details");
+  }, [member, form]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)
@@ -178,6 +199,7 @@ export function EditFamilyMemberDialog({
         familyId: member.familyId,
         createdAt: member.createdAt,
         gender: values.gender,
+        yearOfDeath: values.yearOfDeath,
       }
 
       // Save to database
@@ -198,6 +220,7 @@ export function EditFamilyMemberDialog({
           createdAt: savedMember.created_at,
           familyId: savedMember.family_id,
           gender: savedMember.gender || 'unknown',
+          yearOfDeath: savedMember.year_of_death,
         });
       }
 
@@ -283,10 +306,13 @@ export function EditFamilyMemberDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px]" aria-describedby="edit-family-member-description">
         <DialogHeader>
           <DialogTitle>Edit Family Member</DialogTitle>
         </DialogHeader>
+        <div id="edit-family-member-description" className="sr-only">
+          Use this dialog to edit the details of a family member.
+        </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
@@ -404,6 +430,25 @@ export function EditFamilyMemberDialog({
                         <div className="space-y-1 leading-none">
                           <FormLabel>Deceased</FormLabel>
                         </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="yearOfDeath"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year of Death</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Year of death (e.g. 2020)"
+                            {...field}
+                            disabled={!form.watch("isDeceased")}
+                          />
+                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />

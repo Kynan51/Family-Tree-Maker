@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -26,6 +26,7 @@ import { Loader2 } from "lucide-react"
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   yearOfBirth: z.coerce.number().int().min(1000).max(new Date().getFullYear()),
+  yearOfDeath: z.coerce.number().int().min(1000).max(new Date().getFullYear()).nullable().optional(),
   livingPlace: z.string().min(2, "Living place must be at least 2 characters"),
   isDeceased: z.boolean().default(false),
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
@@ -49,34 +50,60 @@ interface AddFamilyMemberDialogProps {
 export function AddFamilyMemberDialog({ 
   open, 
   onOpenChange, 
-  existingMembers, 
+  existingMembers: existingMembersProp, 
   onAdd,
   source = 'dashboard',
   selectedMember,
   familyId,
   isAdmin = false
 }: AddFamilyMemberDialogProps) {
+  open = open ?? false;
+  console.log("DEBUG: AddFamilyMemberDialog received open prop:", open);
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [relationshipType, setRelationshipType] = useState<'child' | 'parent' | 'spouse'>('child')
   const [activeTab, setActiveTab] = useState("details")
-  const [selectedParents, setSelectedParents] = useState<string[]>([])
+  const [selectedParents, setSelectedParents] = useState<string[]>([]) // Ensure selectedParents is initialized as an empty array
   const [selectedSpouse, setSelectedSpouse] = useState<string | null>(null)
+  const existingMembers = existingMembersProp || [] // Ensure existingMembers defaults to an empty array if undefined
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullName: "",
-      yearOfBirth: undefined,
+      yearOfBirth: "", // Ensure empty string instead of null
+      yearOfDeath: "", // Ensure empty string instead of null
       livingPlace: "",
       isDeceased: false,
       maritalStatus: "Single",
       photoUrl: "",
       isAdmin: false,
-      occupation: undefined,
+      occupation: "", // Ensure empty string instead of null
       gender: "unknown",
     },
   })
+
+  useEffect(() => {
+    // Prefill form with selected member data if available
+    if (selectedMember) {
+      form.reset({
+        fullName: selectedMember.fullName || "",
+        yearOfBirth: selectedMember.yearOfBirth || new Date().getFullYear(),
+        yearOfDeath: selectedMember.yearOfDeath || null,
+        livingPlace: selectedMember.livingPlace || "",
+        isDeceased: selectedMember.isDeceased || false,
+        maritalStatus: selectedMember.maritalStatus || "Single",
+        photoUrl: selectedMember.photoUrl || "",
+        occupation: selectedMember.occupation || "",
+        gender: selectedMember.gender || "unknown",
+      });
+    }
+  }, [selectedMember, form]);
+
+  useEffect(() => {
+    console.log("DEBUG: AddFamilyMemberDialog open prop changed to:", open);
+  }, [open]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)
@@ -125,7 +152,7 @@ export function AddFamilyMemberDialog({
         }
         
         // Only add parent relationships if parents are selected and don't already exist
-        if (selectedParents.length > 0) {
+        if (selectedParents?.length > 0) { // Add optional chaining to prevent errors
           const uniqueParents = selectedParents.filter(parentId => {
             const existingParent = existingMembers.find(m => 
               m.relationships?.some(rel => 
@@ -241,169 +268,176 @@ export function AddFamilyMemberDialog({
           </p>
         </DialogHeader>
 
-        {source === 'card' ? (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {selectedMember && (
-                <div className="space-y-2">
-                  <Label>Relationship to {selectedMember.fullName}</Label>
-                  <Select
-                    value={relationshipType}
-                    onValueChange={(value: 'child' | 'parent' | 'spouse') => setRelationshipType(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select relationship" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="child">Child</SelectItem>
-                      <SelectItem value="parent">Parent</SelectItem>
-                      <SelectItem value="spouse">Spouse</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {source === 'card' ? (
+              <>
+                {selectedMember && (
+                  <div className="space-y-2">
+                    <Label>Relationship to {selectedMember.fullName}</Label>
+                    <Select
+                      value={relationshipType}
+                      onValueChange={(value: 'child' | 'parent' | 'spouse') => setRelationshipType(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select relationship" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="child">Child</SelectItem>
+                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="spouse">Spouse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter full name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="yearOfBirth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Year of Birth</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="livingPlace"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Living Place</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter living place" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="occupation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Occupation</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter occupation (optional)" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="gender"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Gender</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select gender" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                          <SelectItem value="unknown">Unknown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="maritalStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Marital Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select marital status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Single">Single</SelectItem>
-                          <SelectItem value="Married">Married</SelectItem>
-                          <SelectItem value="Divorced">Divorced</SelectItem>
-                          <SelectItem value="Widowed">Widowed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="isDeceased"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Deceased</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {isAdmin && !form.watch("isDeceased") && (
                 <div className="space-y-2">
                   <FormField
                     control={form.control}
-                    name="isAdmin"
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="yearOfBirth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year of Birth</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Year of birth (e.g. 1995)"
+                            {...field}
+                            value={field.value || ""} // Ensure empty string instead of null
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="yearOfDeath"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year of Death</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Year of death (e.g. 2020)"
+                            {...field}
+                            value={field.value || ""} // Ensure empty string instead of null
+                            disabled={!form.watch("isDeceased")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="livingPlace"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Living Place</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter living place" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="occupation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Occupation</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter occupation (optional)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gender</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="unknown">Unknown</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="maritalStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Marital Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select marital status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="isDeceased"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                         <FormControl>
@@ -413,177 +447,14 @@ export function AddFamilyMemberDialog({
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel>Make Admin</FormLabel>
+                          <FormLabel>Deceased</FormLabel>
                         </div>
                       </FormItem>
                     )}
                   />
                 </div>
-              )}
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Member'
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="relationships">Relationships</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="details" className="py-4">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter full name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="yearOfBirth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Year of Birth</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="Year of birth (e.g. 1995)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="livingPlace"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Living Place</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter living place" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="occupation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Occupation</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter occupation (optional)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="gender"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Gender</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select gender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                              <SelectItem value="unknown">Unknown</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="maritalStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Marital Status</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select marital status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Single">Single</SelectItem>
-                              <SelectItem value="Married">Married</SelectItem>
-                              <SelectItem value="Divorced">Divorced</SelectItem>
-                              <SelectItem value="Widowed">Widowed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="isDeceased"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Deceased</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
+                {isAdmin && !form.watch("isDeceased") && (
                   <div className="space-y-2">
                     <FormField
                       control={form.control}
@@ -594,7 +465,6 @@ export function AddFamilyMemberDialog({
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={form.watch("isDeceased")}
                             />
                           </FormControl>
                           <div className="space-y-1 leading-none">
@@ -604,109 +474,320 @@ export function AddFamilyMemberDialog({
                       )}
                     />
                   </div>
-
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
-                      Next
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </TabsContent>
-
-            <TabsContent value="relationships" className="py-4">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Parents</h3>
-                  <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                    {existingMembers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
-                    ) : (
-                      <RadioGroup
-                        value={selectedParents[0] || ""}
-                        onValueChange={(value) => setSelectedParents([value])}
-                      >
-                        {existingMembers.map((member) => (
-                          <div key={member.id} className="flex items-center space-x-2">
-                            <RadioGroupItem value={member.id} id={`parent-${member.id}`} />
-                            <label
-                              htmlFor={`parent-${member.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {member.name || member.fullName} ({member.yearOfBirth})
-                            </label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Spouse</h3>
-                  <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
-                    {existingMembers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
-                    ) : (
-                      <RadioGroup
-                        value={selectedSpouse || ""}
-                        onValueChange={(value) => setSelectedSpouse(value)}
-                      >
-                        {existingMembers.map((member) => (
-                          <div key={member.id} className="flex items-center space-x-2">
-                            <RadioGroupItem value={member.id} id={`spouse-${member.id}`} />
-                            <label
-                              htmlFor={`spouse-${member.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {member.name || member.fullName} ({member.yearOfBirth})
-                            </label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    )}
-                  </div>
-                </div>
+                )}
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
-                    Back
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
                   </Button>
-                  <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : "Save"}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      'Add Member'
+                    )}
                   </Button>
                 </DialogFooter>
-              </div>
-            </TabsContent>
-          </Tabs>
-        )}
+              </>
+            ) : (
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="relationships">Relationships</TabsTrigger>
+                </TabsList>
 
-        {/* File upload section */}
-        <div className="mt-4">
-          <FormField
-            control={form.control}
-            name="photoUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Profile Photo</FormLabel>
-                <FormControl>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                    />
-                    {isUploading && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
+                <TabsContent value="details" className="py-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="fullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter full name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="yearOfBirth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Year of Birth</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="Year of birth (e.g. 1995)"
+                                {...field}
+                                value={field.value || ""} // Ensure empty string instead of null
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="yearOfDeath"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Year of Death</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="Year of death (e.g. 2020)"
+                                {...field}
+                                value={field.value || ""} // Ensure empty string instead of null
+                                disabled={!form.watch("isDeceased")}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="livingPlace"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Living Place</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter living place" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="occupation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Occupation</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter occupation (optional)" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="gender"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="male">Male</SelectItem>
+                                <SelectItem value="female">Female</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                                <SelectItem value="unknown">Unknown</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="maritalStatus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Marital Status</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select marital status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Single">Single</SelectItem>
+                                <SelectItem value="Married">Married</SelectItem>
+                                <SelectItem value="Divorced">Divorced</SelectItem>
+                                <SelectItem value="Widowed">Widowed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="isDeceased"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Deceased</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormField
+                        control={form.control}
+                        name="isAdmin"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={form.watch("isDeceased")}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Make Admin</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
+                        Next
+                      </Button>
+                    </DialogFooter>
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+                </TabsContent>
+
+                <TabsContent value="relationships" className="py-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Parents</h3>
+                      <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
+                        {existingMembers?.length === 0 ? ( // Add optional chaining to prevent errors
+                          <p className="text-sm text-muted-foreground">No existing members to select as parents</p>
+                        ) : (
+                          <RadioGroup
+                            value={selectedParents[0] || ""}
+                            onValueChange={(value) => setSelectedParents([value])}
+                          >
+                            {existingMembers.map((member) => (
+                              <div key={member.id} className="flex items-center space-x-2">
+                                <RadioGroupItem value={member.id} id={`parent-${member.id}`} />
+                                <label
+                                  htmlFor={`parent-${member.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {member.name || member.fullName} ({member.yearOfBirth})
+                                </label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Spouse</h3>
+                      <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
+                        {existingMembers?.length === 0 ? ( // Add optional chaining to prevent errors
+                          <p className="text-sm text-muted-foreground">No existing members to select as spouse</p>
+                        ) : (
+                          <RadioGroup
+                            value={selectedSpouse || ""}
+                            onValueChange={(value) => setSelectedSpouse(value)}
+                          >
+                            {existingMembers.map((member) => (
+                              <div key={member.id} className="flex items-center space-x-2">
+                                <RadioGroupItem value={member.id} id={`spouse-${member.id}`} />
+                                <label
+                                  htmlFor={`spouse-${member.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {member.name || member.fullName} ({member.yearOfBirth})
+                                </label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        )}
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setActiveTab("details")}>
+                        Back
+                      </Button>
+                      <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting}>
+                        {isSubmitting ? "Saving..." : "Save"}
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                </TabsContent>
+              </Tabs>
             )}
-          />
-        </div>
+
+            {/* File upload section */}
+            <div className="mt-4">
+              <FormField
+                control={form.control}
+                name="photoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profile Photo</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          disabled={isUploading}
+                        />
+                        {isUploading && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -37,6 +37,16 @@ export function UserProfile({ user }: UserProfileProps) {
       bio: user.bio || "",
     },
   })
+
+  useEffect(() => {
+    // Prefill form with user data if available
+    if (user) {
+      form.reset({
+        name: user.name || "",
+        bio: user.bio || "",
+      });
+    }
+  }, [user, form]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true)

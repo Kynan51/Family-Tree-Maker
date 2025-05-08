@@ -66,17 +66,20 @@ export function AddOrEditFamilyMemberWrapper(props) {
         onOpenChange={handleFamilyDialogClose}
       />
       {selectedFamilyId && (
-        <EditFamilyMemberDialog
-          open={props.open}
-          onOpenChange={val => {
-            if (!val) setSelectedFamilyId(""); // Reset on close
-            props.onOpenChange(val);
-          }}
-          member={props.member}
-          existingMembers={familyMembers}
-          onUpdate={props.onUpdate}
-          familyId={selectedFamilyId}
-        />
+        <>
+          {console.log("DEBUG: Member passed to EditFamilyMemberDialog:", props.member)} {/* Debug log */}
+          <EditFamilyMemberDialog
+            open={props.open}
+            onOpenChange={val => {
+              if (!val) setSelectedFamilyId(""); // Reset on close
+              props.onOpenChange(val);
+            }}
+            member={props.member}
+            existingMembers={familyMembers}
+            onUpdate={props.onUpdate}
+            familyId={selectedFamilyId}
+          />
+        </>
       )}
     </>
   );

@@ -253,6 +253,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       onMouseEnter={e => handleMouseEnter(e, {
         name: partner.name,
         yearOfBirth: partner.yearOfBirth,
+        yearOfDeath: partner.yearOfDeath,
         livingPlace: partner.livingPlace,
         occupation: partner.occupation,
         isDeceased: partner.isDeceased,
@@ -286,6 +287,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       onMouseEnter={e => handleMouseEnter(e, {
         name: partner.name,
         yearOfBirth: partner.yearOfBirth,
+        yearOfDeath: partner.yearOfDeath,
         livingPlace: partner.livingPlace,
         occupation: partner.occupation,
         isDeceased: partner.isDeceased,
@@ -319,6 +321,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
   const plusWidth = 32; // estimate for plus sign and margin
   const totalWidth = totalCards * cardWidth + plusSigns * plusWidth;
 
+  // Adjust the z-index of the tooltip to ensure it is below the dialog
+  const tooltipZIndex = 9; // Further reduce the z-index to ensure it is below the dialog
+
   return (
     <g>
       <foreignObject 
@@ -343,8 +348,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
       </foreignObject>
       {showTooltip && tooltipData && ReactDOM.createPortal(
         <div
-          className="fixed z-[9999] bg-card border border-border shadow-lg rounded-lg p-3 text-sm"
+          className="fixed bg-card border border-border shadow-lg rounded-lg p-3 text-sm"
           style={{
+            zIndex: tooltipZIndex, // Apply the adjusted z-index
             left: tooltipPosition.x,
             top: tooltipPosition.y,
             transform: 'translateY(-100%)',
@@ -367,6 +373,9 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
           )}
           {tooltipData.gender && (
             <div className="text-muted-foreground text-xs">Gender: {tooltipData.gender.charAt(0).toUpperCase() + tooltipData.gender.slice(1)}</div>
+          )}
+          {tooltipData.yearOfDeath && (
+            <div className="text-muted-foreground text-xs">Died: {tooltipData.yearOfDeath}</div>
           )}
         </div>,
         document.body
@@ -833,8 +842,8 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
       {renderOverlay()}
       {showAddDialog && (
         <AddFamilyMemberDialog
-          isOpen={showAddDialog}
-          onClose={() => setShowAddDialog(false)}
+          open={showAddDialog}
+          onOpenChange={(open) => setShowAddDialog(open)}
           onSubmit={handleAddMember}
           parentMember={selectedMember}
         />
