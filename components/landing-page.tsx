@@ -1,8 +1,26 @@
-import { LoadingLink } from "@/components/ui/loading-link"
-import { Button } from "@/components/ui/button"
-import { Users } from "lucide-react"
+"use client";
+
+import { useEffect, useState } from "react";
+import { LoadingLink } from "@/components/ui/loading-link";
+import { Button } from "@/components/ui/button";
+import { Users } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export function LandingPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 text-center">
@@ -27,5 +45,5 @@ export function LandingPage() {
         </div>
       </div>
     </>
-  )
+  );
 }

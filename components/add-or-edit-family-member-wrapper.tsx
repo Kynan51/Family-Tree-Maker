@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { EditFamilyMemberDialog } from "./edit-family-member-dialog";
 import { FamilySelectDialog } from "./family-select-dialog";
+import { LoadingSpinner } from "./ui/loading-spinner";
 
 // TODO: Replace this with your actual families data source or prop
 const families = [
@@ -10,6 +11,27 @@ const families = [
 ];
 
 export function AddOrEditFamilyMemberWrapper(props) {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading or replace with actual data fetching logic
+    const fetchData = async () => {
+      setIsLoading(true);
+      // Example: await fetchFamilies();
+      setTimeout(() => setIsLoading(false), 1000); // Replace with real data loading
+    };
+
+    fetchData();
+  }, [props.accessibleFamilies, props.allMembers]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   // Only show families where user is admin
   const adminFamilies = props.accessibleFamilies?.filter(
     fam =>
@@ -62,4 +84,4 @@ export function AddOrEditFamilyMemberWrapper(props) {
       )}
     </>
   );
-} 
+}

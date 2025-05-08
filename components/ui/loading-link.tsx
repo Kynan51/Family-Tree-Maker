@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LoadingSpinner } from "./loading-spinner"
 
@@ -24,9 +24,20 @@ export function LoadingLink({
 }: LoadingLinkProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const pathname = usePathname();
+
+  // Clear loading state on route change
+  useEffect(() => {
+    setIsLoading(false)
+  }, [pathname])
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
+    // Only show spinner and navigate if href is different from current pathname
+    if (href.toString() === pathname) {
+      onClick?.(e)
+      return
+    }
     setIsLoading(true)
     // Use setTimeout to ensure the loading state is rendered before navigation
     setTimeout(() => {
@@ -60,4 +71,4 @@ export function LoadingLink({
       </Link>
     </>
   )
-} 
+}
