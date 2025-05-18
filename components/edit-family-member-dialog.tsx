@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useCallback, useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -25,12 +25,11 @@ const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   yearOfBirth: z.coerce.number().int().min(1000).max(new Date().getFullYear()),
   livingPlace: z.string().min(2, "Living place must be at least 2 characters"),
-  isDeceased: z.boolean().default(false),
+  isDeceased: z.boolean(), // always required
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
   photoUrl: z.string().optional(),
   occupation: z.string().optional(),
-  gender: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
-  yearOfDeath: z.coerce.number().int().min(1000).max(new Date().getFullYear()).nullable().optional(),
+  gender: z.enum(["male", "female", "other", "unknown"]),
 })
 
 interface EditFamilyMemberDialogProps {
@@ -66,6 +65,7 @@ export function EditFamilyMemberDialog({
   // Initialize relationships from member data
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
   const [selectedSpouse, setSelectedSpouse] = useState<string[]>([]);
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -73,22 +73,21 @@ export function EditFamilyMemberDialog({
 
   // Filter members to only show those in the same family
   const familyMembers = existingMembers.filter(
-    m => (m.familyId === familyId || m.family_id === familyId) && m.id !== member.id
+    m => m.familyId === familyId && m.id !== member.id
   );
 
   // Initialize form with member data
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: member.fullName || member.name || member.full_name || "", // Ensure full_name is mapped
-      yearOfBirth: member.yearOfBirth || member.year_of_birth || "",
-      livingPlace: member.livingPlace || member.living_place || "",
-      isDeceased: member.isDeceased || member.is_deceased || false,
-      maritalStatus: member.maritalStatus || member.marital_status || "Single",
-      photoUrl: member.photoUrl || member.photo_url || "",
+      fullName: member.fullName || member.name || "",
+      yearOfBirth: member.yearOfBirth || new Date().getFullYear(),
+      livingPlace: member.livingPlace || "",
+      isDeceased: member.isDeceased ?? false,
+      maritalStatus: ["Single", "Married", "Divorced", "Widowed"].includes(member.maritalStatus) ? member.maritalStatus as any : "Single",
+      photoUrl: member.photoUrl || "",
       occupation: member.occupation || "",
-      gender: member.gender || "unknown",
-      yearOfDeath: member.yearOfDeath || member.year_of_death || "", // Prefill yearOfDeath
+      gender: ["male", "female", "other", "unknown"].includes(member.gender) ? member.gender as any : "unknown",
     },
   })
 
@@ -103,14 +102,20 @@ export function EditFamilyMemberDialog({
     const fetchRelationships = async () => {
       setIsLoading(true);
       try {
-        const relationships = await getFamilyMemberRelationships(member.id);
+        const relationships = await getFamilyMemberRelationships(member.id);        // Correct prefill logic:
+        // Parents: type === 'child' (I am a child of X, so X is my parent)
+        // Children: type === 'parent' (I am a parent of X, so X is my child)
         const parentIds = relationships
+          .filter(r => r.type === "child")
+          .map(r => r.related_member_id);
+        const childIds = relationships
           .filter(r => r.type === "parent")
           .map(r => r.related_member_id);
         const spouseIds = relationships
           .filter(r => r.type === "spouse")
           .map(r => r.related_member_id);
         setSelectedParents(parentIds);
+        setSelectedChildren(childIds);
         setSelectedSpouse(spouseIds);
       } catch (error) {
         toast({
@@ -128,65 +133,34 @@ export function EditFamilyMemberDialog({
   // Reset form when member changes
   useEffect(() => {
     form.reset({
-      fullName: member.fullName || member.name || member.full_name || "",
-      yearOfBirth: member.yearOfBirth || member.year_of_birth,
-      livingPlace: member.livingPlace || member.living_place,
-      isDeceased: member.isDeceased || member.is_deceased || false,
-      maritalStatus: member.maritalStatus || member.marital_status || "Single",
-      photoUrl: member.photoUrl || member.photo_url || "",
+      fullName: member.fullName || member.name || "",
+      yearOfBirth: member.yearOfBirth || new Date().getFullYear(),
+      livingPlace: member.livingPlace || "",
+      isDeceased: member.isDeceased ?? false,
+      maritalStatus: ["Single", "Married", "Divorced", "Widowed"].includes(member.maritalStatus) ? member.maritalStatus as any : "Single",
+      photoUrl: member.photoUrl || "",
       occupation: member.occupation || "",
-      gender: member.gender || "unknown",
-      yearOfDeath: member.yearOfDeath || member.year_of_death || null,
+      gender: ["male", "female", "other", "unknown"].includes(member.gender) ? member.gender as any : "unknown",
     });
-    
-    // Set active tab to details when member changes
     setActiveTab("details");
   }, [member, form])
 
-  useEffect(() => {
-    // Prefill form with member data
-    form.reset({
-      fullName: member.fullName || member.name || member.full_name || "",
-      yearOfBirth: member.yearOfBirth || new Date().getFullYear(),
-      livingPlace: member.livingPlace || "",
-      isDeceased: member.isDeceased || false,
-      maritalStatus: member.maritalStatus || "Single",
-      photoUrl: member.photoUrl || "",
-      occupation: member.occupation || "",
-      gender: member.gender || "unknown",
-      yearOfDeath: member.yearOfDeath || null,
-    });
-
-    // Set active tab to details when member changes
-    setActiveTab("details");
-  }, [member, form]);
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setIsSubmitting(true)
-
+  const onSubmit: import("react-hook-form").SubmitHandler<z.infer<typeof formSchema>> = async (values) => {
+    setIsSubmitting(true);
     try {
-      // Create relationships array
-      const relationships: Relationship[] = []
-
-      // Add parent relationships
+      const relationships: Relationship[] = [];
       selectedParents.forEach((parentId) => {
-        relationships.push({
-          type: "parent",
-          relatedMemberId: parentId,
-        })
-      })
-
-      // Add spouse relationships
+        relationships.push({ type: "parent", relatedMemberId: parentId });
+      });
+      selectedChildren.forEach((childId) => {
+        relationships.push({ type: "child", relatedMemberId: childId });
+      });
       selectedSpouse.forEach((spouseId) => {
-        relationships.push({
-          type: "spouse",
-          relatedMemberId: spouseId,
-        })
-      })
-
-      // Transform form values to match database schema
+        relationships.push({ type: "spouse", relatedMemberId: spouseId });
+      });
       const updatedMember: FamilyMember = {
         id: member.id,
+        name: values.fullName, // always set name
         fullName: values.fullName,
         yearOfBirth: values.yearOfBirth,
         livingPlace: values.livingPlace,
@@ -199,53 +173,25 @@ export function EditFamilyMemberDialog({
         familyId: member.familyId,
         createdAt: member.createdAt,
         gender: values.gender,
-        yearOfDeath: values.yearOfDeath,
-      }
-
-      // Save to database
+      };
       const savedMember = await updateFamilyMember(updatedMember);
       if (onUpdate && savedMember) {
-        console.log('DEBUG: Calling onUpdate with:', savedMember);
-        onUpdate({
-          id: savedMember.id,
-          fullName: savedMember.full_name,
-          yearOfBirth: savedMember.year_of_birth,
-          livingPlace: savedMember.living_place,
-          isDeceased: savedMember.is_deceased,
-          maritalStatus: savedMember.marital_status,
-          photoUrl: savedMember.photo_url,
-          occupation: savedMember.occupation,
-          relationships: savedMember.relationships || [],
-          updatedAt: savedMember.updated_at,
-          createdAt: savedMember.created_at,
-          familyId: savedMember.family_id,
-          gender: savedMember.gender || 'unknown',
-          yearOfDeath: savedMember.year_of_death,
-        });
+        onUpdate(savedMember);
       }
-
-      // Show success message
-      if (typeof toast.success === 'function') {
-        toast.success("Family member updated successfully");
-      } else {
-        toast({
-          title: "Success",
-          description: "Family member updated successfully",
-          variant: "success",
-        });
-      }
-
-      // Close the dialog after successful update
-      onOpenChange(false)
+      toast({
+        title: "Success",
+        description: "Family member updated successfully",
+        variant: "default",
+      });
+      onOpenChange(false);
     } catch (error) {
-      console.error('DEBUG: Error in onSubmit:', error);
       toast({
         title: "Error",
         description: "Failed to update family member",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -436,25 +382,6 @@ export function EditFamilyMemberDialog({
 
                   <FormField
                     control={form.control}
-                    name="yearOfDeath"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year of Death</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Year of death (e.g. 2020)"
-                            {...field}
-                            disabled={!form.watch("isDeceased")}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="photoUrl"
                     render={({ field }) => (
                       <FormItem>
@@ -574,8 +501,7 @@ export function EditFamilyMemberDialog({
                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
                             {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
-                          </label>
-                        </div>
+                          </label>                        </div>
                       ))
                     )}
                   </div>
@@ -602,6 +528,37 @@ export function EditFamilyMemberDialog({
                           />
                           <label
                             htmlFor={`spouse-${existingMember.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})
+                          </label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Children <span className="text-xs text-muted-foreground">(select people this member is a parent of)</span></h3>
+                  <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
+                    {familyMembers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No existing members to select as children</p>
+                    ) : (
+                      familyMembers.map((existingMember) => (
+                        <div key={existingMember.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`child-${existingMember.id}`}
+                            checked={selectedChildren.includes(existingMember.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedChildren((prev) => [...prev, existingMember.id])
+                              } else {
+                                setSelectedChildren((prev) => prev.filter((id) => id !== existingMember.id))
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`child-${existingMember.id}`}
                             className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
                             {existingMember.fullName || existingMember.name} ({existingMember.yearOfBirth})

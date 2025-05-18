@@ -8,6 +8,7 @@ import Link from "next/link"
 import { FamilyTreeRootMemberForm } from "@/components/family-tree-root-member-form"
 import { ShareButton } from "@/components/share-button"
 import FamilyTreeClientPage from "@/components/family-tree-client-page";
+import { getFamilyMembers } from "@/lib/data"
 
 export default async function FamilyTreePage(props: { params: { familyId: string } } | { params: Promise<{ familyId: string }> }) {
   let params = props.params as any;
@@ -93,36 +94,16 @@ export default async function FamilyTreePage(props: { params: { familyId: string
     )
   }
 
-  // Get family members
-  const { data: members, error: membersError } = await supabase
-    .from("family_members")
-    .select(`
-      *,
-      relationships:relationships!member_id(
-        type,
-        related_member_id,
-        related_member:family_members!related_member_id(
-          full_name
-        )
-      )
-    `)
-    .eq("family_id", familyId)
-
-  if (membersError) {
-    console.error("Error fetching members:", membersError)
-    return <div>Error loading family members</div>
-  }
+  // Get family members (with relationships)
+  const members = await getFamilyMembers(familyId)
 
   // Transform the data for the tree view
   const safeMembers = members || []
   const transformedMembers = safeMembers.map((member) => ({
     ...member,
-    name: member.full_name,
+    name: member.fullName,
     children: [],
-    relationships: (member.relationships || []).map((r) => ({
-      ...r,
-      relatedMemberId: r.related_member_id,
-    })),
+    relationships: member.relationships || [],
   }))
 
   // Debugging log
@@ -130,6 +111,21 @@ export default async function FamilyTreePage(props: { params: { familyId: string
 
   // If there are no members, show a root-member form (only for admins)
   if (safeMembers.length === 0) {
+    // --- PATCH: skip root member form if just imported ---
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('importedFamilyId') === familyId) {
+      window.sessionStorage.removeItem('importedFamilyId');
+      // Show a loading or empty message instead of the form
+      return (
+        <div className="container mx-auto py-6 flex flex-col items-center justify-center">
+          <h1 className="text-3xl font-bold mb-6">{family.name}</h1>
+          <div className="card bg-card text-card-foreground rounded-lg shadow-lg p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4 text-center">Family Tree Imported</h2>
+            <p className="card-description mb-6 text-center">Your family tree was imported. If you don't see members, try refreshing.</p>
+          </div>
+        </div>
+      );
+    }
+    // --- END PATCH ---
     if (!session) {
       return (
         <div className="container mx-auto py-6 flex flex-col items-center justify-center">
@@ -137,9 +133,6 @@ export default async function FamilyTreePage(props: { params: { familyId: string
           <div className="card bg-card text-card-foreground rounded-lg shadow-lg p-8 w-full max-w-md">
             <h2 className="text-2xl font-bold mb-4 text-center">Empty Family Tree</h2>
             <p className="card-description mb-6 text-center">This family tree is empty. Please log in to add members.</p>
-            <Link href="/login" className="block w-full text-center px-6 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition">
-              Log In
-            </Link>
           </div>
         </div>
       )

@@ -10,9 +10,60 @@ import * as XLSX from 'xlsx'
 import { getSession } from '@/lib/auth'
 import { getFamilyMembers } from '@/lib/data'
 import { FamilyMember } from '@/lib/types'
+import { demoFamilyMembers } from '@/lib/demo-family-tree'
 
 export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const familyId = searchParams.get('familyId');
+    const format = searchParams.get('format') || 'excel';
+
+    // Allow unauthenticated export for demo family
+    if (familyId === 'demo-family' && format === 'excel') {
+      const familyMembers = demoFamilyMembers;
+      const memberMap = Object.fromEntries(familyMembers.map(m => [m.id, m]));
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Family Tree');
+      worksheet.columns = [
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Birth Year', key: 'birthYear', width: 15 },
+        { header: 'Death Year', key: 'deathYear', width: 15 },
+        { header: 'Parents', key: 'parents', width: 40 },
+        { header: 'Spouse', key: 'spouse', width: 30 },
+        { header: 'Children', key: 'children', width: 40 },
+      ];
+      familyMembers.forEach((member) => {
+        // Parents: relationships where this member is a child (type === 'child')
+        const parents = member.relationships
+          ?.filter(r => r.type === 'child')
+          .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
+          .join(', ') || '';
+        // Children: relationships where this member is a parent (type === 'parent')
+        const children = member.relationships
+          ?.filter(r => r.type === 'parent')
+          .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
+          .join(', ') || '';
+        // Spouse: relationship where type === 'spouse'
+        const spouseRel = member.relationships?.find(r => r.type === 'spouse');
+        const spouse = spouseRel ? (memberMap[spouseRel.relatedMemberId]?.fullName || spouseRel.relatedMemberId) : '';
+        worksheet.addRow({
+          name: member.fullName || member.name,
+          birthYear: member.yearOfBirth || '',
+          deathYear: member.isDeceased ? 'Deceased' : '',
+          parents,
+          spouse,
+          children,
+        });
+      });
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="family-tree-${familyId}.xlsx"`,
+        },
+      });
+    }
+
     const session = await getSession();
     if (!session) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -21,10 +72,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const { searchParams } = new URL(request.url);
-    const familyId = searchParams.get('familyId');
-    const format = searchParams.get('format') || 'excel';
-
+    // familyId and format already declared above
     if (!familyId) {
       return new Response(JSON.stringify({ error: 'Family ID is required' }), {
         status: 400,
@@ -33,7 +81,8 @@ export async function GET(request: Request) {
     }
 
     // Fetch family members
-    const familyMembers = await getFamilyMembers(familyId);
+    const familyMembers = await getFamilyMembers(familyId || undefined);
+    const memberMap = Object.fromEntries(familyMembers.map(m => [m.id, m]));
     if (!familyMembers || familyMembers.length === 0) {
       return new Response(JSON.stringify({ error: 'No family members found' }), {
         status: 404,
@@ -42,13 +91,11 @@ export async function GET(request: Request) {
     }
 
     // Log the export
-    await logExport(session.user.id, familyId, format);
+    await logExport(session.user.id, familyId || '', format);
 
     // Generate Excel file
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Family Tree');
-
-    // Add headers
     worksheet.columns = [
       { header: 'Name', key: 'name', width: 30 },
       { header: 'Birth Year', key: 'birthYear', width: 15 },
@@ -57,23 +104,17 @@ export async function GET(request: Request) {
       { header: 'Spouse', key: 'spouse', width: 30 },
       { header: 'Children', key: 'children', width: 40 },
     ];
-
-    // Process family members data
-    familyMembers.forEach((member: FamilyMember) => {
+    familyMembers.forEach((member) => {
       const parents = member.relationships
-        ?.filter(r => r.type === 'parent')
-        .map(r => r.relatedMemberId)
-        .join(', ') || '';
-
-      const spouse = member.relationships
-        ?.find(r => r.type === 'spouse')
-        ?.relatedMemberId || '';
-
-      const children = member.relationships
         ?.filter(r => r.type === 'child')
-        .map(r => r.relatedMemberId)
+        .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
         .join(', ') || '';
-
+      const children = member.relationships
+        ?.filter(r => r.type === 'parent')
+        .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
+        .join(', ') || '';
+      const spouseRel = member.relationships?.find(r => r.type === 'spouse');
+      const spouse = spouseRel ? (memberMap[spouseRel.relatedMemberId]?.fullName || spouseRel.relatedMemberId) : '';
       worksheet.addRow({
         name: member.fullName || member.name,
         birthYear: member.yearOfBirth || '',
@@ -83,10 +124,7 @@ export async function GET(request: Request) {
         children,
       });
     });
-
-    // Generate Excel buffer
     const buffer = await workbook.xlsx.writeBuffer();
-
     return new Response(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

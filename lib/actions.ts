@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import type { FamilyMember } from "@/lib/types"
 import { revalidatePath } from "next/cache"
 
-export async function createFamilyMember(member: FamilyMember) {
+export async function createFamilyMember(member: FamilyMember, options?: { skipRelationships?: boolean }) {
   const supabase = createAdminClient() // Admin operation
 
   try {
@@ -75,8 +75,8 @@ export async function createFamilyMember(member: FamilyMember) {
       throw new Error(`Failed to create family member: ${memberError.message}`)
     }
 
-    // Insert relationships
-    if (relationships.length > 0) {
+    // Insert relationships (unless skipRelationships is true)
+    if (!options?.skipRelationships && relationships.length > 0) {
       // Create all relationships in a single transaction
       const allRelationships = relationships
         .filter(rel => rel.relatedMemberId)

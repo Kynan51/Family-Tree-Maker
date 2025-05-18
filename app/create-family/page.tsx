@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,8 @@ import * as XLSX from "xlsx"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createFamilyMember } from "@/lib/actions"
 
+type RelationshipPreview = { type: 'parent' | 'spouse' | 'child', relatedName: string };
+
 export default function CreateFamilyPage() {
   const router = useRouter()
   const { session } = useSupabaseAuth()
@@ -22,22 +24,62 @@ export default function CreateFamilyPage() {
   const [error, setError] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false);
+  const [familyCreated, setFamilyCreated] = useState(false);
+  const [fileUploaded, setFileUploaded] = useState(false);
+  const [familyId, setFamilyId] = useState<string | null>(null); // NEW: track created familyId
+  const [importedMembers, setImportedMembers] = useState<any[]>([]); // Store imported members
+
+  useEffect(() => {
+    // If redirected after import, skip root member form
+    if (typeof window !== 'undefined') {
+      const importedFamilyId = window.sessionStorage.getItem('importedFamilyId');
+      if (importedFamilyId) {
+        window.sessionStorage.removeItem('importedFamilyId');
+        setFamilyId(importedFamilyId); // set familyId from sessionStorage
+        setFamilyCreated(true);
+        router.replace(`/tree/${importedFamilyId}`);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
-
     if (!session) {
       setError("You must be logged in to create a family")
       setIsLoading(false)
       return
     }
-
+    if (familyId) {
+      setError("A family has already been created in this session.")
+      setIsLoading(false)
+      return
+    }
     try {
+      if (importedMembers.length > 0) {
+        // Use API route for import
+        const res = await fetch("/api/import-family", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description,
+            isPublic,
+            userId: session.user.id,
+            members: importedMembers,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to import family");
+        setFamilyId(String(data.familyId));
+        setFamilyCreated(true);
+        router.push(`/tree/${data.familyId}`);
+        return;
+      }
+      // Manual family creation fallback
       const supabase = createClient()
-
-      // Create the family
       const { data: family, error: familyError } = await supabase
         .from("families")
         .insert([
@@ -49,10 +91,7 @@ export default function CreateFamilyPage() {
         ])
         .select()
         .single()
-
       if (familyError) throw familyError
-
-      // Create the user's access to the family
       const { error: accessError } = await supabase
         .from("user_family_access")
         .insert([
@@ -63,23 +102,24 @@ export default function CreateFamilyPage() {
             status: "approved",
           },
         ])
-
       if (accessError) throw accessError
-
-      // Redirect to the new family's tree page
+      setFamilyId(String(family.id))
+      setFamilyCreated(true)
       router.push(`/tree/${family.id}`)
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating family:", err)
-      setError("Failed to create family. Please try again.")
+      setError(err.message || "Failed to create family. Please try again.")
       setIsLoading(false)
     }
   }
 
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Refactored import handler to accept a File
+  const handleImportExcel = async (file: File) => {
     setImportError(null)
     setImportSuccess(null)
-    const file = e.target.files?.[0]
+    setFileUploaded(false)
     if (!file) return
+    setFileUploaded(true)
     if (!session) {
       setImportError("You must be logged in to import members.")
       return
@@ -98,226 +138,115 @@ export default function CreateFamilyPage() {
         setImportError("No data found in the file.")
         return
       }
-      // Create the family first
-      let familyId = null
-      try {
-        const supabase = createClient()
-        const { data: family, error: familyError } = await supabase
-          .from("families")
-          .insert([
-            {
-              name,
-              description,
-              is_public: isPublic,
-            },
-          ])
-          .select()
-          .single()
-        if (familyError) throw familyError
-        familyId = family.id
-        // Give user admin access
-        await supabase.from("user_family_access").insert([
-          {
-            user_id: session.user.id,
-            family_id: familyId,
-            access_level: "admin",
-            status: "approved",
-          },
-        ])
-      } catch (err) {
-        setImportError("Failed to create family before import.")
-        return
-      }
-      // Parse members
-      const members: any[] = rows.map(row => Object.fromEntries(headers.map((h, i) => [h, row[i]])))
-      // Find rootless members (no parent)
-      const rootless = members.filter(m => !m.parents || m.parents.trim() === "")
-      let unknownRootId: string | null = null
-      let rootIds: string[] = []
-      let nameToId: Record<string, string> = {}
-      // Helper: check if all rootless are spouses of each other
-      const allRootlessAreSpouses = () => {
-        if (rootless.length < 2) return false
-        const names = rootless.map(m => m.full_name)
-        return rootless.every(m => {
-          if (!m.spouses) return false
-          const spouseNames = m.spouses.split(',').map((n: string) => n.trim()).filter(Boolean)
-          // Should be all other rootless
-          return names.filter(n => n !== m.full_name).every(n => spouseNames.includes(n))
-        })
-      }
-      // If user manually entered a root (via form), treat as root
-      let manualRootId: string | null = null
-      if (name && !members.some(m => m.full_name === name)) {
-        manualRootId = crypto.randomUUID()
-        nameToId[name] = manualRootId
-        await createFamilyMember({
-          id: manualRootId,
-          name,
-          fullName: name,
-          yearOfBirth: 1950,
-          livingPlace: "unknown",
-          isDeceased: false,
-          maritalStatus: "unknown",
-          photoUrl: null,
-          relationships: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          familyId,
-          occupation: "unknown",
-        })
-      }
-      if (manualRootId) {
-        // All rootless become children of manual root
-        rootIds = rootless.map(m => {
-          const id = crypto.randomUUID();
-          nameToId[m.full_name] = id;
-          return id;
-        })
-      } else if (rootless.length === 0 || (members[0].parents && members[0].parents.trim() !== "")) {
-        // Year of birth for unknown root: 30 years before first member
-        const firstYob = Number(members[0].year_of_birth) || 1970
-        const unknownId = crypto.randomUUID()
-        unknownRootId = unknownId
-        await createFamilyMember({
-          id: unknownId,
-          name: "unknown",
-          fullName: "unknown",
-          yearOfBirth: firstYob - 30,
-          livingPlace: "unknown",
-          isDeceased: false,
-          maritalStatus: "unknown",
-          photoUrl: null,
-          relationships: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          familyId,
-          occupation: "unknown",
-        })
-        // All members with no parent will be children of unknown
-        rootIds = rootless.map(m => {
-          const id = crypto.randomUUID();
-          nameToId[m.full_name] = id;
-          return id;
-        })
-      } else if (rootless.length === 1) {
-        // Single root
-        rootIds = [crypto.randomUUID()]
-        nameToId[rootless[0].full_name] = rootIds[0]
-      } else if (allRootlessAreSpouses()) {
-        // All rootless are spouses: pick first as root, link rest as spouses
-        rootIds = [crypto.randomUUID()]
-        nameToId[rootless[0].full_name] = rootIds[0]
-        for (let i = 1; i < rootless.length; ++i) {
-          nameToId[rootless[i].full_name] = crypto.randomUUID()
+      // Normalize headers to lowercase and remove spaces for robust mapping
+      const lowerHeaders = (headers as string[]).map(h => h.toLowerCase().replace(/\s+/g, ''))
+      let missingNameCount = 0
+      let missingYearCount = 0
+      const members: any[] = rows.map((row, idx, allRows) => {
+        const objRaw = Object.fromEntries(lowerHeaders.map((h, i) => [h, (row as any[])[i]]))
+        let baseName = objRaw["name"] || objRaw["fullname"] || objRaw["full_name"] || ""
+        if (typeof baseName === "string") baseName = baseName.trim()
+        if (!baseName) {
+          baseName = `Unknown ${idx + 1}`
+          missingNameCount++
         }
-      } else {
-        // Multiple rootless: create unknown root, make all rootless siblings
-        const firstYob = Number(members[0].year_of_birth) || 1970
-        const unknownId = crypto.randomUUID()
-        unknownRootId = unknownId
-        await createFamilyMember({
-          id: unknownId,
-          name: "unknown",
-          fullName: "unknown",
-          yearOfBirth: firstYob - 30,
-          livingPlace: "unknown",
-          isDeceased: false,
-          maritalStatus: "unknown",
-          photoUrl: null,
-          relationships: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          familyId,
-          occupation: "unknown",
-        })
-        rootIds = rootless.map(m => {
-          const id = crypto.randomUUID();
-          nameToId[m.full_name] = id;
-          return id;
-        })
-      }
-      // Insert all members
-      for (const m of members) {
-        const id = nameToId[m.full_name] || crypto.randomUUID()
-        nameToId[m.full_name] = id
-        let isDeceased = false
-        if (typeof m.is_deceased === 'string') {
-          const val = m.is_deceased.trim().toLowerCase()
-          isDeceased = val === 'yes' || val === 'true' || val === '1'
-        } else if (typeof m.is_deceased === 'number') {
-          isDeceased = m.is_deceased === 1
-        } else if (typeof m.is_deceased === 'boolean') {
-          isDeceased = m.is_deceased
+        let yearOfBirth = objRaw["birthyear"] || objRaw["yearofbirth"] || objRaw["birth_year"] || objRaw["year"] || ""
+        yearOfBirth = String(yearOfBirth).trim()
+        let yearOfBirthNum = Number(yearOfBirth)
+        if (!yearOfBirth || isNaN(yearOfBirthNum) || yearOfBirthNum < 1000 || yearOfBirthNum > 2100) {
+          yearOfBirthNum = 1970 + idx
+          missingYearCount++
         }
-        await createFamilyMember({
-          id,
-          name: m.full_name,
-          fullName: m.full_name,
-          yearOfBirth: Number(m.year_of_birth),
-          livingPlace: m.living_place,
+        const yearOfDeath = objRaw["deathyear"] || objRaw["yearofdeath"] || objRaw["death_year"] || ""
+        const livingPlace = objRaw["livingplace"] || objRaw["living_place"] || objRaw["place"] || objRaw["location"] || "Unknown"
+        const maritalStatus = objRaw["maritalstatus"] || objRaw["marital_status"] || objRaw["status"] || "Single"
+        const occupation = objRaw["occupation"] || ""
+        const gender = objRaw["gender"] || "unknown"
+        const isDeceased = yearOfDeath && String(yearOfDeath).trim() !== '' ? true : false
+        // Always map relationship fields as comma-separated strings (never arrays)
+        // Use only lowercased, spaceless keys for relationship fields
+        let parents = typeof objRaw["parents"] === 'string' ? objRaw["parents"].trim() : ''
+        let spouses = '';
+        if (typeof objRaw["spouse"] === 'string') {
+          spouses = objRaw["spouse"].trim();
+        } else if (typeof objRaw["spouses"] === 'string') {
+          spouses = objRaw["spouses"].trim();
+        }
+        let children = typeof objRaw["children"] === 'string' ? objRaw["children"].trim() : ''
+        // If relationships array is present, also populate parents/spouses/children fields
+        if (Array.isArray(objRaw.relationships)) {
+          const rels = objRaw.relationships as { type: string, relatedName: string }[];
+          const parentNames = rels.filter(r => r.type === 'parent').map(r => r.relatedName).join(', ');
+          const spouseNames = rels.filter(r => r.type === 'spouse').map(r => r.relatedName).join(', ');
+          const childNames = rels.filter(r => r.type === 'child').map(r => r.relatedName).join(', ');
+          if (!parents && parentNames) parents = parentNames;
+          if (!spouses && spouseNames) spouses = spouseNames;
+          if (!children && childNames) children = childNames;
+        }
+        // Build relationships array for preview/debugging
+        const relationships: RelationshipPreview[] = [];
+        if (parents) {
+          parents.split(',').map((n: string) => n.trim()).filter(Boolean).forEach((parentName: string) => {
+            relationships.push({ type: 'parent', relatedName: parentName })
+          })
+        }
+        if (spouses) {
+          spouses.split(',').map((n: string) => n.trim()).filter(Boolean).forEach((spouseName: string) => {
+            relationships.push({ type: 'spouse', relatedName: spouseName })
+          })
+        }
+        if (children) {
+          children.split(',').map((n: string) => n.trim()).filter(Boolean).forEach((childName: string) => {
+            relationships.push({ type: 'child', relatedName: childName })
+          })
+        }
+        // Debug log for each member's relationships
+        console.debug(`[IMPORT] Member: ${baseName}, Relationships:`, relationships)
+        return {
+          name: baseName,
+          full_name: baseName,
+          fullName: baseName,
+          yearOfBirth: yearOfBirthNum,
+          yearOfDeath: yearOfDeath && String(yearOfDeath).trim() !== '' ? Number(yearOfDeath) : undefined,
+          livingPlace: livingPlace && String(livingPlace).trim() !== '' ? livingPlace : 'Unknown',
           isDeceased,
-          maritalStatus: m.marital_status,
-          photoUrl: m.photo_url || null,
-          relationships: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          familyId,
-          occupation: m.occupation || '',
-        })
-      }
-      // Insert relationships
-      const supabase = createAdminClient()
-      for (const m of members) {
-        const memberId = nameToId[m.full_name]
-        // Parents
-        if (m.parents && m.parents.trim() !== "") {
-          for (const parentName of m.parents.split(',').map((n: string) => n.trim()).filter(Boolean)) {
-            const parentId = nameToId[parentName] || unknownRootId || manualRootId
-            if (parentId) {
-              await supabase.from('relationships').upsert([
-                { member_id: memberId, related_member_id: parentId, type: 'parent' },
-                { member_id: parentId, related_member_id: memberId, type: 'child' }
-              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
-            }
-          }
-        } else if (unknownRootId || manualRootId) {
-          // No parent: link to unknown or manual root
-          const rootId = unknownRootId || manualRootId
-          await supabase.from('relationships').upsert([
-            { member_id: memberId, related_member_id: rootId, type: 'child' },
-            { member_id: rootId, related_member_id: memberId, type: 'parent' }
-          ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
+          maritalStatus: ["Single", "Married", "Divorced", "Widowed"].includes(maritalStatus) ? maritalStatus : undefined,
+          occupation: occupation && String(occupation).trim() !== '' ? occupation : undefined,
+          gender: ["male", "female", "other", "unknown"].includes(gender) ? gender : undefined,
+          parents,
+          spouses,
+          children,
+          photoUrl: null,
+          relationships,
         }
-        // Spouses
-        if (m.spouses && m.spouses.trim() !== "") {
-          for (const spouseName of m.spouses.split(',').map((n: string) => n.trim()).filter(Boolean)) {
-            const spouseId = nameToId[spouseName]
-            if (spouseId) {
-              await supabase.from('relationships').upsert([
-                { member_id: memberId, related_member_id: spouseId, type: 'spouse' },
-                { member_id: spouseId, related_member_id: memberId, type: 'spouse' }
-              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
-            }
-          }
-        }
-        // Children
-        if (m.children && m.children.trim() !== "") {
-          for (const childName of m.children.split(',').map((n: string) => n.trim()).filter(Boolean)) {
-            const childId = nameToId[childName]
-            if (childId) {
-              await supabase.from('relationships').upsert([
-                { member_id: memberId, related_member_id: childId, type: 'child' },
-                { member_id: childId, related_member_id: memberId, type: 'parent' }
-              ], { onConflict: 'member_id,related_member_id,type', ignoreDuplicates: true })
-            }
-          }
-        }
-      }
-      setImportSuccess("Family and members imported successfully!")
-      router.push(`/tree/${familyId}`)
+      })
+      // Log the transformed members for verification (expanded)
+      console.log('[IMPORT] Transformed Members:')
+      members.forEach(m => console.log(m))
+      let importWarnings = []
+      if (missingNameCount > 0) importWarnings.push(`${missingNameCount} member(s) had missing or empty names and were set to 'Unknown'.`)
+      if (missingYearCount > 0) importWarnings.push(`${missingYearCount} member(s) had missing or invalid year of birth and were set to a default value.`)
+      if (importWarnings.length > 0) setImportError(importWarnings.join(' '))
+      setImportedMembers(members)
+      setImportSuccess("Members imported and ready to create family!")
     }
     reader.readAsBinaryString(file)
+  }
+
+  // Drag and drop handlers
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleImportExcel(file)
+  }
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
   }
 
   return (
@@ -368,9 +297,39 @@ export default function CreateFamilyPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Import Members from Excel</label>
-              <input type="file" accept=".xlsx,.xls" onChange={handleImportExcel} />
-              {importError && <div className="text-sm text-red-500">{importError}</div>}
-              {importSuccess && <div className="text-sm text-green-600">{importSuccess}</div>}
+              {/* Drag-and-drop area */}
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"}`}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+              >
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style={{ display: "none" }}
+                  id="import-excel"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) handleImportExcel(file)
+                  }}
+                />
+                <label htmlFor="import-excel" className="cursor-pointer block">
+                  <span className="font-medium">Click to select a file</span>
+                  <span className="mx-2 text-muted-foreground">or drag and drop here</span>
+                </label>
+              </div>
+            </div>
+            <div className="mb-4">
+              {fileUploaded && (
+                <div className="text-green-600 font-medium">File uploaded successfully!</div>
+              )}
+              {importError && (
+                <div className="text-red-600 font-medium">{importError}</div>
+              )}
+              {importSuccess && (
+                <div className="text-green-600 font-medium">{importSuccess}</div>
+              )}
             </div>
             {error && (
               <div className="text-sm text-red-500">
@@ -379,7 +338,7 @@ export default function CreateFamilyPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={isLoading}>
+            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={isLoading || familyCreated}>
               {isLoading ? "Creating..." : "Create Family Tree"}
             </Button>
           </CardFooter>
@@ -387,4 +346,4 @@ export default function CreateFamilyPage() {
       </Card>
     </div>
   )
-} 
+}

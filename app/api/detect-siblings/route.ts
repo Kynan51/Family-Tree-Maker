@@ -98,42 +98,64 @@ export async function POST(request: Request) {
       console.log(`\nCreating parent for siblings born around ${birthYear}:`)
       siblings.forEach(s => console.log(`- ${s.full_name} (${s.year_of_birth})`))
 
-      // Create a default parent
-      const { data: parent, error: parentError } = await supabase
+      // Check if an unknown parent already exists for this group
+      const { data: existingParents, error: findParentError } = await supabase
         .from("family_members")
-        .insert({
-          full_name: `Unknown Parent (${birthYear})`,
-          year_of_birth: parseInt(birthYear) - 30, // Assume parent is 30 years older
-          living_place: "Unknown",
-          is_deceased: false,
-          marital_status: "Unknown",
-          family_id: familyId
-        })
-        .select()
-        .single()
+        .select("id, full_name, year_of_birth")
+        .eq("family_id", familyId)
+        .eq("full_name", `Unknown Parent (${birthYear})`)
+        .limit(1)
 
-      if (parentError) {
-        console.error("Error creating parent:", parentError)
-        continue
+      let parent = existingParents && existingParents.length > 0 ? existingParents[0] : null;
+      if (!parent) {
+        // Create a default parent if not found
+        const { data: newParent, error: parentError } = await supabase
+          .from("family_members")
+          .insert({
+            full_name: `Unknown Parent (${birthYear})`,
+            year_of_birth: parseInt(birthYear) - 30, // Assume parent is 30 years older
+            living_place: "Unknown",
+            is_deceased: false,
+            marital_status: "Unknown",
+            family_id: familyId
+          })
+          .select()
+          .single()
+        if (parentError || !newParent) {
+          console.error("Error creating parent:", parentError)
+          continue
+        }
+        parent = newParent;
+      } else {
+        if (parent) {
+          console.log(`Found existing parent: ${parent.full_name} (${parent.year_of_birth})`)
+        } else {
+          console.log("Found existing parent: null")
+        }
       }
 
+      if (!parent) {
+        console.error("Parent is null after creation or lookup, skipping group.");
+        continue;
+      }
       console.log(`Created parent: ${parent.full_name} (${parent.year_of_birth})`)
 
       // Create parent-child relationships
       for (const sibling of siblings) {
-        console.log(`Creating relationship between ${parent.full_name} and ${sibling.full_name}`)
+        // Use optional chaining to avoid null errors
+        console.log(`Creating relationship between ${parent?.full_name} and ${sibling.full_name}`);
         await supabase.from("relationships").upsert([
           {
-            member_id: sibling.id,
-            related_member_id: parent.id,
+            member_id: parent!.id,
+            related_member_id: sibling.id,
             type: "parent"
           },
           {
-            member_id: parent.id,
-            related_member_id: sibling.id,
+            member_id: sibling.id,
+            related_member_id: parent!.id,
             type: "child"
           }
-        ], { onConflict: "member_id,related_member_id,type" })
+        ]);
       }
     }
 
@@ -142,4 +164,4 @@ export async function POST(request: Request) {
     console.error("Error in detect-siblings route:", error)
     return new NextResponse("Internal Server Error", { status: 500 })
   }
-} 
+}

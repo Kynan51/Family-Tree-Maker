@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { SubmitHandler } from "react-hook-form"
 
 import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
@@ -23,17 +24,16 @@ import { createAdminAccess } from "@/lib/actions"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Loader2 } from "lucide-react"
 
+// Fix: Ensure all required fields are always present in defaultValues and Zod schema, and that isDeceased is not optional anywhere
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   yearOfBirth: z.coerce.number().int().min(1000).max(new Date().getFullYear()),
-  yearOfDeath: z.coerce.number().int().min(1000).max(new Date().getFullYear()).nullable().optional(),
   livingPlace: z.string().min(2, "Living place must be at least 2 characters"),
-  isDeceased: z.boolean().default(false),
+  isDeceased: z.boolean(), // Remove .default and make required
   maritalStatus: z.enum(["Single", "Married", "Divorced", "Widowed"]),
   photoUrl: z.string().optional(),
-  isAdmin: z.boolean().default(false),
   occupation: z.string().optional(),
-  gender: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
+  gender: z.enum(["male", "female", "other", "unknown"]), // Remove .default and make required
 })
 
 interface AddFamilyMemberDialogProps {
@@ -68,18 +68,17 @@ export function AddFamilyMemberDialog({
   const [selectedSpouse, setSelectedSpouse] = useState<string | null>(null)
   const existingMembers = existingMembersProp || [] // Ensure existingMembers defaults to an empty array if undefined
 
+  // Explicitly type the form as z.infer<typeof formSchema>
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       fullName: "",
-      yearOfBirth: "", // Ensure empty string instead of null
-      yearOfDeath: "", // Ensure empty string instead of null
+      yearOfBirth: new Date().getFullYear(),
       livingPlace: "",
       isDeceased: false,
       maritalStatus: "Single",
       photoUrl: "",
-      isAdmin: false,
-      occupation: "", // Ensure empty string instead of null
+      occupation: "",
       gender: "unknown",
     },
   })
@@ -88,15 +87,26 @@ export function AddFamilyMemberDialog({
     // Prefill form with selected member data if available
     if (selectedMember) {
       form.reset({
-        fullName: selectedMember.fullName || "",
+        fullName: selectedMember.fullName || selectedMember.name || "",
         yearOfBirth: selectedMember.yearOfBirth || new Date().getFullYear(),
-        yearOfDeath: selectedMember.yearOfDeath || null,
         livingPlace: selectedMember.livingPlace || "",
-        isDeceased: selectedMember.isDeceased || false,
-        maritalStatus: selectedMember.maritalStatus || "Single",
+        isDeceased: selectedMember.isDeceased ?? false,
+        maritalStatus: ["Single", "Married", "Divorced", "Widowed"].includes(selectedMember.maritalStatus) ? selectedMember.maritalStatus as any : "Single",
         photoUrl: selectedMember.photoUrl || "",
         occupation: selectedMember.occupation || "",
-        gender: selectedMember.gender || "unknown",
+        gender: ["male", "female", "other", "unknown"].includes(selectedMember.gender) ? selectedMember.gender as any : "unknown",
+      });
+    } else {
+      // Always provide all required fields for reset
+      form.reset({
+        fullName: "",
+        yearOfBirth: new Date().getFullYear(),
+        livingPlace: "",
+        isDeceased: false,
+        maritalStatus: "Single",
+        photoUrl: "",
+        occupation: "",
+        gender: "unknown",
       });
     }
   }, [selectedMember, form]);
@@ -105,7 +115,8 @@ export function AddFamilyMemberDialog({
     console.log("DEBUG: AddFamilyMemberDialog open prop changed to:", open);
   }, [open]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  // Explicitly type onSubmit as SubmitHandler<z.infer<typeof formSchema>>
+  const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = async (values) => {
     setIsSubmitting(true)
 
     try {
@@ -152,11 +163,11 @@ export function AddFamilyMemberDialog({
         }
         
         // Only add parent relationships if parents are selected and don't already exist
-        if (selectedParents?.length > 0) { // Add optional chaining to prevent errors
+        if (selectedParents?.length > 0) {
           const uniqueParents = selectedParents.filter(parentId => {
-            const existingParent = existingMembers.find(m => 
-              m.relationships?.some(rel => 
-                rel.relatedMemberId === parentId && 
+            const existingParent = existingMembers.find(m =>
+              m.relationships?.some(rel =>
+                rel.relatedMemberId === parentId &&
                 rel.type === 'parent'
               )
             )
@@ -165,7 +176,7 @@ export function AddFamilyMemberDialog({
 
           uniqueParents.forEach((parentId) => {
             relationships.push({
-              type: "parent",
+              type: "child", // The new member is a child of the selected parent
               relatedMemberId: parentId,
             })
           })
@@ -194,17 +205,16 @@ export function AddFamilyMemberDialog({
       const { data: createdMember, error } = await createFamilyMember(newMember)
       if (error) throw error
 
-      // If admin access is requested and member is not deceased, create admin access
-      if (values.isAdmin && !values.isDeceased) {
-        await createAdminAccess(createdMember.id, createdMember.family_id)
-      }
-
       // Update local state if callback provided
       if (onAdd) {
         onAdd(createdMember)
       }
 
-      toast.success("Family member added successfully")
+      toast({
+        title: "Success",
+        description: "Family member added successfully",
+        variant: "default"
+      })
 
       onOpenChange(false)
     } catch (error) {
@@ -331,28 +341,6 @@ export function AddFamilyMemberDialog({
                 <div className="space-y-2">
                   <FormField
                     control={form.control}
-                    name="yearOfDeath"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year of Death</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="Year of death (e.g. 2020)"
-                            {...field}
-                            value={field.value || ""} // Ensure empty string instead of null
-                            disabled={!form.watch("isDeceased")}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <FormField
-                    control={form.control}
                     name="livingPlace"
                     render={({ field }) => (
                       <FormItem>
@@ -454,28 +442,6 @@ export function AddFamilyMemberDialog({
                   />
                 </div>
 
-                {isAdmin && !form.watch("isDeceased") && (
-                  <div className="space-y-2">
-                    <FormField
-                      control={form.control}
-                      name="isAdmin"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Make Admin</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                     Cancel
@@ -530,28 +496,6 @@ export function AddFamilyMemberDialog({
                                 placeholder="Year of birth (e.g. 1995)"
                                 {...field}
                                 value={field.value || ""} // Ensure empty string instead of null
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <FormField
-                        control={form.control}
-                        name="yearOfDeath"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Year of Death</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                placeholder="Year of death (e.g. 2020)"
-                                {...field}
-                                value={field.value || ""} // Ensure empty string instead of null
-                                disabled={!form.watch("isDeceased")}
                               />
                             </FormControl>
                             <FormMessage />
@@ -664,27 +608,6 @@ export function AddFamilyMemberDialog({
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <FormField
-                        control={form.control}
-                        name="isAdmin"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                disabled={form.watch("isDeceased")}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Make Admin</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => setActiveTab("relationships")}>
                         Next
@@ -696,7 +619,7 @@ export function AddFamilyMemberDialog({
                 <TabsContent value="relationships" className="py-4">
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-medium mb-2">Parents</h3>
+                      <h3 className="text-sm font-medium mb-2">Parents <span className="text-xs text-muted-foreground">(select people this member is a child of)</span></h3>
                       <div className="border rounded-md p-4 space-y-2 max-h-40 overflow-y-auto">
                         {existingMembers?.length === 0 ? ( // Add optional chaining to prevent errors
                           <p className="text-sm text-muted-foreground">No existing members to select as parents</p>

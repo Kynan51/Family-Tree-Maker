@@ -114,11 +114,8 @@ interface Relationship {
 }
 
 function buildNestedFamilyTree(flatMembers: FamilyMember[]): FamilyMember[] {
-  // Create a map of all members, using the first occurrence of each member
+  // Map of all members by ID
   const memberMap = new Map<string, FamilyMember>()
-  const processedRelationships = new Set<string>()
-  
-  // First pass: create unique member objects
   flatMembers.forEach(m => {
     if (!memberMap.has(m.id)) {
       memberMap.set(m.id, {
@@ -129,48 +126,50 @@ function buildNestedFamilyTree(flatMembers: FamilyMember[]): FamilyMember[] {
       })
     }
   })
-  
-  // Second pass: handle relationships
+
+  // Build parent relationships
+  const childToParents: Record<string, string[]> = {}
   flatMembers.forEach(member => {
-    if (!member.relationships) return;
+    if (!member.relationships) return
     member.relationships.forEach((rel: { type: string; relatedMemberId: string }) => {
-      // Create a consistent key for bidirectional relationships
-      const [id1, id2] = [member.id, rel.relatedMemberId].sort()
-      const relationshipKey = `${id1}-${id2}-${rel.type}`
-      
-      if (processedRelationships.has(relationshipKey)) {
-        return
+      if (rel.type === 'parent') {
+        if (!childToParents[member.id]) childToParents[member.id] = []
+        childToParents[member.id].push(rel.relatedMemberId)
       }
-      
-      const relatedMember = memberMap.get(rel.relatedMemberId)
-      if (!relatedMember) {
-        return
-      }
-      
-      if (rel.type === "parent") {
-        // Only add child if it hasn't been processed yet
-        if (!memberMap.get(member.id)?.children?.some((c: FamilyMember) => c.id === relatedMember.id)) {
-          memberMap.get(member.id)?.children?.push(relatedMember)
-          processedRelationships.add(relationshipKey)
+    })
+  })
+
+  // Track which members have been attached as children (to avoid duplicates)
+  const attachedAsChild = new Set<string>()
+
+  // Attach children to parents, but only once per child
+  flatMembers.forEach(member => {
+    if (!member.relationships) return
+    member.relationships.forEach((rel: { type: string; relatedMemberId: string }) => {
+      if (rel.type === 'parent') {
+        const parent = memberMap.get(rel.relatedMemberId)
+        const child = memberMap.get(member.id)
+        if (parent && child && !attachedAsChild.has(child.id)) {
+          parent.children = parent.children || []
+          if (!parent.children.some(c => c.id === child.id)) {
+            parent.children.push(child)
+            attachedAsChild.add(child.id)
+          }
         }
-      } else if (rel.type === "spouse") {
-        // Only add spouse if not already added
-        if (!memberMap.get(member.id)?.partners?.some((p: FamilyMember) => p.id === relatedMember.id)) {
-          memberMap.get(member.id)?.partners?.push(relatedMember)
-          processedRelationships.add(relationshipKey)
+      } else if (rel.type === 'spouse') {
+        const spouse = memberMap.get(rel.relatedMemberId)
+        if (spouse && member.id !== spouse.id) {
+          const partners = memberMap.get(member.id)?.partners || []
+          if (!partners.some(p => p.id === spouse.id)) {
+            memberMap.get(member.id)!.partners!.push(spouse)
+          }
         }
       }
     })
   })
-  
-  // Find root members (those who are not children of any other member)
-  const roots = Array.from(memberMap.values()).filter(member => {
-    const isChild = Array.from(memberMap.values()).some(m => 
-      m.children?.some((c: FamilyMember) => c.id === member.id)
-    )
-    return !isChild
-  })
-  
+
+  // Roots: members who are not attached as a child to any parent
+  const roots = Array.from(memberMap.values()).filter(member => !attachedAsChild.has(member.id))
   return roots
 }
 
@@ -524,8 +523,28 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
   const nestedData = useMemo(() => buildNestedFamilyTree(membersState), [membersState])
   const treeData = useMemo(() => transformToD3Tree(nestedData), [nestedData])
 
-  // Center the tree horizontally
-  const translate = { x: 400, y: 100 }
+  // Calculate max node width for current tree
+  const maxNodeWidth = useMemo(() => getMaxNodeWidth(nestedData), [nestedData])
+
+  // Center the tree horizontally based on container width
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    function updateWidth() {
+      if (svgRef.current) {
+        setContainerWidth(svgRef.current.offsetWidth)
+      }
+    }
+    updateWidth()
+    window.addEventListener('resize', updateWidth)
+    return () => window.removeEventListener('resize', updateWidth)
+  }, [])
+
+  // Calculate translate.x to center the root
+  const translate = useMemo(() => ({
+    x: Math.max(containerWidth / 2, maxNodeWidth / 2),
+    y: 100
+  }), [containerWidth, maxNodeWidth])
 
   // Handler to capture node positions from react-d3-tree
   const handleTreeUpdate = (treeData: any, nodes: any) => {
@@ -617,6 +636,9 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v2"/></svg>
                   </div>
                   <span className="font-medium text-center text-sm truncate w-full" title={partner.name}>{partner.name}</span>
+                  <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.gender || 'unknown'}>
+                    {partner.gender?.charAt(0).toUpperCase() + partner.gender?.slice(1) || 'Unknown'}
+                  </span>
                   <span className="text-xs text-muted-foreground truncate w-full text-center" title={partner.relation}>{partner.relation}</span>
                 </div>
               </Card>
@@ -695,6 +717,33 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
         variant: "destructive",
       })
     }
+  }
+
+  // Utility to calculate the required width for a node based on partners
+  function getNodeWidth(node: any) {
+    const partners = node.partners?.length || 0;
+    const totalCards = partners + 1;
+    const plusSigns = Math.max(0, totalCards - 1);
+    const cardWidth = 160;
+    const plusWidth = 32;
+    const width = totalCards * cardWidth + plusSigns * plusWidth;
+    return Math.max(200, Math.min(width, 600));
+  }
+
+  // Utility to get the max node width in the tree
+  function getMaxNodeWidth(members: any[]): number {
+    let maxWidth = 200;
+    function traverse(nodes: any[]) {
+      nodes.forEach(node => {
+        const width = getNodeWidth(node);
+        if (width > maxWidth) maxWidth = width;
+        if (node.children && node.children.length > 0) {
+          traverse(node.children);
+        }
+      });
+    }
+    traverse(members);
+    return maxWidth;
   }
 
   if (!treeData || (Array.isArray(treeData) && treeData.length === 0)) {
@@ -817,7 +866,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
 
   return (
     <div className="relative">
-      <div ref={svgRef} className="relative">
+      <div ref={svgRef} className="relative w-full h-full min-h-[600px]">
         <TreeComponent
           data={treeData}
           translate={translate}
@@ -826,7 +875,7 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
           collapsible={false}
           zoomable={true}
           scaleExtent={{ min: 0.1, max: 2 }}
-          nodeSize={{ x: 200, y: 200 }}
+          nodeSize={{ x: maxNodeWidth, y: 200 }}
           separation={{ siblings: 1, nonSiblings: 1 }}
           renderCustomNodeElement={(rd3tProps) => (
             <CustomNode
@@ -835,7 +884,6 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
               isAdmin={isAdmin}
             />
           )}
-          onUpdate={handleTreeUpdate}
         />
       </div>
       <SiblingConnectorOverlay nodePositions={nodePositions} membersState={membersState} />
@@ -844,8 +892,17 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
         <AddFamilyMemberDialog
           open={showAddDialog}
           onOpenChange={(open) => setShowAddDialog(open)}
-          onSubmit={handleAddMember}
-          parentMember={selectedMember}
+          onAdd={(member) => {
+            // Remove generation property if present
+            const { generation, ...rest } = member as any;
+            // Call async handler, but don't await (AddFamilyMemberDialog expects sync)
+            void handleAddMember(rest as FamilyMember);
+          }}
+          existingMembers={membersState}
+          selectedMember={selectedMember ?? undefined}
+          familyId={familyId}
+          isAdmin={isAdmin}
+          source="card"
         />
       )}
     </div>
