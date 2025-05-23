@@ -4,20 +4,21 @@ import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
 
+  // Use resolvedTheme for UI state, but theme for toggling
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+      onClick={() => setTheme(resolvedTheme === "light" ? "dark" : "light")}
       aria-label="Toggle theme"
       className="relative h-9 w-9 transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       {/* Sun icon for light theme */}
       <span 
         className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
-          theme === "dark" ? "opacity-0 rotate-90 scale-0" : "opacity-100 rotate-0 scale-100"
+          resolvedTheme === "dark" ? "opacity-0 rotate-90 scale-0" : "opacity-100 rotate-0 scale-100"
         }`}
       >
         <svg 
@@ -44,7 +45,7 @@ export function ThemeToggle() {
       {/* Moon icon for dark theme */}
       <span 
         className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
-          theme === "dark" ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-0"
+          resolvedTheme === "dark" ? "opacity-100 rotate-0 scale-100" : "opacity-0 -rotate-90 scale-0"
         }`}
       >
         <svg 
@@ -62,4 +63,4 @@ export function ThemeToggle() {
       </span>
     </Button>
   )
-} 
+}

@@ -1,3 +1,5 @@
+import MiniCssExtractPlugin from 'mini-css-extract-plugin'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -34,6 +36,10 @@ const nextConfig = {
         },
       },
     }
+
+    // Add MiniCssExtractPlugin for CSS extraction
+    config.plugins = config.plugins || []
+    config.plugins.push(new MiniCssExtractPlugin())
 
     // Handle react-d3-tree specifically
     if (!isServer) {
