@@ -61,40 +61,57 @@ export async function POST(req: NextRequest) {
     }
     // Log the full incoming members array for debugging
     console.log('[IMPORT] Incoming members payload:', JSON.stringify(members, null, 2));
-    // Insert all members
+    // Insert all members (prevent duplicates by checking DB first)
     for (const m of members) {
       // Log each member's relationship fields for debugging
       console.log(`[IMPORT] Member: ${m.full_name} | Parents: ${m.parents} | Spouses: ${m.spouses} | Children: ${m.children}`);
-      const id = nameToId[normalizeName(m.full_name)];
-      let isDeceased = false;
-      if (typeof m.isDeceased === 'boolean') {
-        isDeceased = m.isDeceased;
-      } else if (typeof m.is_deceased === 'string') {
-        const val = m.is_deceased.trim().toLowerCase();
-        isDeceased = val === 'yes' || val === 'true' || val === '1';
-      } else if (typeof m.is_deceased === 'number') {
-        isDeceased = m.is_deceased === 1;
+      const normName = normalizeName(m.full_name);
+      let id = nameToId[normName];
+      let existingId = null;
+      // Check for existing member in DB (by name, year, place, family)
+      const { data: existingMember, error: checkError } = await supabase
+        .from('family_members')
+        .select('id')
+        .eq('full_name', m.full_name)
+        .eq('year_of_birth', m.yearOfBirth)
+        .eq('living_place', m.livingPlace || m.living_place || 'Unknown')
+        .eq('family_id', family.id)
+        .maybeSingle();
+      if (existingMember && existingMember.id) {
+        existingId = existingMember.id;
+        nameToId[normName] = existingId;
+        console.log(`[IMPORT] Skipping insert for existing member: ${m.full_name} (ID: ${existingId})`);
+      } else {
+        let isDeceased = false;
+        if (typeof m.isDeceased === 'boolean') {
+          isDeceased = m.isDeceased;
+        } else if (typeof m.is_deceased === 'string') {
+          const val = m.is_deceased.trim().toLowerCase();
+          isDeceased = val === 'yes' || val === 'true' || val === '1';
+        } else if (typeof m.is_deceased === 'number') {
+          isDeceased = m.is_deceased === 1;
+        }
+        const maritalStatus = typeof m.maritalStatus === 'string' && ["Single", "Married", "Divorced", "Widowed"].includes(m.maritalStatus) ? m.maritalStatus : "Single";
+        const gender = typeof m.gender === 'string' && ["male", "female", "other", "unknown"].includes(m.gender) ? m.gender : "unknown";
+        const yearOfBirth = m.yearOfBirth;
+        // Insert only if not exists
+        await createFamilyMember({
+          id,
+          name: m.full_name,
+          fullName: m.full_name,
+          yearOfBirth: yearOfBirth,
+          livingPlace: m.livingPlace || m.living_place || 'Unknown',
+          isDeceased,
+          maritalStatus,
+          photoUrl: m.photoUrl || m.photo_url || null,
+          relationships: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          familyId: String(family.id),
+          occupation: m.occupation || '',
+          gender,
+        }, { skipRelationships: true });
       }
-      const maritalStatus = typeof m.maritalStatus === 'string' && ["Single", "Married", "Divorced", "Widowed"].includes(m.maritalStatus) ? m.maritalStatus : "Single";
-      const gender = typeof m.gender === 'string' && ["male", "female", "other", "unknown"].includes(m.gender) ? m.gender : "unknown";
-      const yearOfBirth = m.yearOfBirth;
-      // Log relationship fields for debugging
-      await createFamilyMember({
-        id,
-        name: m.full_name,
-        fullName: m.full_name,
-        yearOfBirth: yearOfBirth,
-        livingPlace: m.livingPlace || m.living_place || 'Unknown',
-        isDeceased,
-        maritalStatus,
-        photoUrl: m.photoUrl || m.photo_url || null,
-        relationships: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        familyId: String(family.id),
-        occupation: m.occupation || '',
-        gender,
-      }, { skipRelationships: true });
     }
     // --- NEW: Fetch all members for this family and rebuild nameToId mapping ---
     const { data: dbMembers, error: dbMembersError } = await supabase
@@ -124,10 +141,11 @@ export async function POST(req: NextRequest) {
         for (const parentName of m.parents.split(',').map((n: string) => n.trim()).filter(Boolean)) {
           const parentId = dbNameToId[normalizeName(parentName)];
           if (parentId) {
-            relationshipsToInsert.push({ member_id: memberId, related_member_id: parentId, type: 'parent' });
-            relationshipsToInsert.push({ member_id: parentId, related_member_id: memberId, type: 'child' });
+            // Only assign: child -> parent (type: 'parent'), parent -> child (type: 'child')
+            relationshipsToInsert.push({ member_id: memberId, related_member_id: parentId, type: 'parent' }); // child -> parent
+            relationshipsToInsert.push({ member_id: parentId, related_member_id: memberId, type: 'child' }); // parent -> child
             totalRelationships += 2;
-            console.log(`[IMPORT] Creating parent/child relationship: ${m.full_name} (child) <-> ${parentName} (parent)`);
+            console.log(`[IMPORT] Creating parent/child relationship: ${m.full_name} (child) -> ${parentName} (parent)`);
           } else {
             skippedRelationships.push({ member: m.full_name, related: parentName, type: 'parent' });
             console.warn(`[IMPORT] Skipped parent relationship: ${m.full_name} -> ${parentName} (not found)`);
@@ -139,10 +157,11 @@ export async function POST(req: NextRequest) {
         for (const childName of m.children.split(',').map((n: string) => n.trim()).filter(Boolean)) {
           const childId = dbNameToId[normalizeName(childName)];
           if (childId) {
-            relationshipsToInsert.push({ member_id: memberId, related_member_id: childId, type: 'child' });
-            relationshipsToInsert.push({ member_id: childId, related_member_id: memberId, type: 'parent' });
+            // Only assign: parent -> child (type: 'child'), child -> parent (type: 'parent')
+            relationshipsToInsert.push({ member_id: memberId, related_member_id: childId, type: 'child' }); // parent -> child
+            relationshipsToInsert.push({ member_id: childId, related_member_id: memberId, type: 'parent' }); // child -> parent
             totalRelationships += 2;
-            console.log(`[IMPORT] Creating child/parent relationship: ${m.full_name} (parent) <-> ${childName} (child)`);
+            console.log(`[IMPORT] Creating child/parent relationship: ${m.full_name} (parent) -> ${childName} (child)`);
           } else {
             skippedRelationships.push({ member: m.full_name, related: childName, type: 'child' });
             console.warn(`[IMPORT] Skipped child relationship: ${m.full_name} -> ${childName} (not found)`);

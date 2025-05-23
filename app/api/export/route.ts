@@ -33,14 +33,14 @@ export async function GET(request: Request) {
         { header: 'Children', key: 'children', width: 40 },
       ];
       familyMembers.forEach((member) => {
-        // Parents: relationships where this member is a child (type === 'child')
+        // Parents: relationships where this member is a child (type === 'parent')
         const parents = member.relationships
-          ?.filter(r => r.type === 'child')
+          ?.filter(r => r.type === 'parent')
           .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
           .join(', ') || '';
-        // Children: relationships where this member is a parent (type === 'parent')
+        // Children: relationships where this member is a parent (type === 'child')
         const children = member.relationships
-          ?.filter(r => r.type === 'parent')
+          ?.filter(r => r.type === 'child')
           .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
           .join(', ') || '';
         // Spouse: relationship where type === 'spouse'
@@ -64,14 +64,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const session = await getSession();
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
     // familyId and format already declared above
     if (!familyId) {
       return new Response(JSON.stringify({ error: 'Family ID is required' }), {
@@ -90,8 +82,11 @@ export async function GET(request: Request) {
       });
     }
 
-    // Log the export
-    await logExport(session.user.id, familyId || '', format);
+    // Log the export only if authenticated
+    const session = await getSession();
+    if (session) {
+      await logExport(session.user.id, familyId || '', format);
+    }
 
     // Generate Excel file
     const workbook = new ExcelJS.Workbook();
@@ -105,12 +100,14 @@ export async function GET(request: Request) {
       { header: 'Children', key: 'children', width: 40 },
     ];
     familyMembers.forEach((member) => {
+      // Parents: relationships where this member is a child (type === 'parent')
       const parents = member.relationships
-        ?.filter(r => r.type === 'child')
+        ?.filter(r => r.type === 'parent')
         .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
         .join(', ') || '';
+      // Children: relationships where this member is a parent (type === 'child')
       const children = member.relationships
-        ?.filter(r => r.type === 'parent')
+        ?.filter(r => r.type === 'child')
         .map(r => memberMap[r.relatedMemberId]?.fullName || r.relatedMemberId)
         .join(', ') || '';
       const spouseRel = member.relationships?.find(r => r.type === 'spouse');

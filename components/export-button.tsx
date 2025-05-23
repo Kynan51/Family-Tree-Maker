@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Download as DownloadIcon, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
+import { Download as DownloadIcon, FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 interface ExportButtonProps {
@@ -306,68 +306,38 @@ const generateFamilyTreeSVG = (): string | null => {
     }
     
     member.relationships.forEach((rel: Relationship) => {
-      const [id1, id2] = [member.id, rel.relatedMemberId].sort()
-      const relationshipKey = `${id1}-${id2}-${rel.type}`
-      
-      if (processedRelationships.has(relationshipKey)) {
-        return
-      }
-      
-      const relatedMember = memberMap.get(rel.relatedMemberId)
-      if (!relatedMember) {
-        return
-      }
-      
+      // Only use explicit relationship type for directionality
       if (rel.type === "parent") {
-        const member1 = memberMap.get(member.id)
-        const member2 = relatedMember
-        
-        // Skip if either member is missing birth year
-        if (!member1?.yearOfBirth || !member2?.yearOfBirth) {
-          return
-        }
-        
-        // The one with earlier birth year should be the parent
-        const parentMember = member1.yearOfBirth < member2.yearOfBirth ? member1 : member2
-        const childMember = member1.yearOfBirth < member2.yearOfBirth ? member2 : member1
-        
-        if (!parentMember.children) parentMember.children = []
-        if (!parentMember.children.some(c => c.id === childMember.id)) {
-          parentMember.children.push(childMember)
-          processedRelationships.add(relationshipKey)
+        // This member is the child, rel.relatedMemberId is the parent
+        const child = memberMap.get(member.id)
+        const parent = memberMap.get(rel.relatedMemberId)
+        if (child && parent) {
+          if (!parent.children) parent.children = []
+          if (!parent.children.some(c => c.id === child.id)) {
+            parent.children.push(child)
+          }
         }
       } else if (rel.type === "child") {
-        const member1 = memberMap.get(member.id)
-        const member2 = relatedMember
-        
-        // Skip if either member is missing birth year
-        if (!member1?.yearOfBirth || !member2?.yearOfBirth) {
-          return
-        }
-        
-        // The one with earlier birth year should be the parent
-        const parentMember = member1.yearOfBirth < member2.yearOfBirth ? member1 : member2
-        const childMember = member1.yearOfBirth < member2.yearOfBirth ? member2 : member1
-        
-        if (!parentMember.children) parentMember.children = []
-        if (!parentMember.children.some(c => c.id === childMember.id)) {
-          parentMember.children.push(childMember)
-          processedRelationships.add(relationshipKey)
+        // This member is the parent, rel.relatedMemberId is the child
+        const parent = memberMap.get(member.id)
+        const child = memberMap.get(rel.relatedMemberId)
+        if (parent && child) {
+          if (!parent.children) parent.children = []
+          if (!parent.children.some(c => c.id === child.id)) {
+            parent.children.push(child)
+          }
         }
       } else if (rel.type === "spouse") {
-        const member1 = memberMap.get(id1)
-        if (member1) {
+        const member1 = memberMap.get(member.id)
+        const member2 = memberMap.get(rel.relatedMemberId)
+        if (member1 && member2) {
           if (!member1.partners) member1.partners = []
-          if (!member1.partners.some(p => p.id === id2)) {
-            const partner = memberMap.get(id2)
-            if (partner) {
-              member1.partners.push(partner)
-              // Also add the reciprocal relationship
-              if (!partner.partners) partner.partners = []
-              if (!partner.partners.some(p => p.id === id1)) {
-                partner.partners.push(member1)
-              }
-            }
+          if (!member1.partners.some(p => p.id === member2.id)) {
+            member1.partners.push(member2)
+          }
+          if (!member2.partners) member2.partners = []
+          if (!member2.partners.some(p => p.id === member1.id)) {
+            member2.partners.push(member1)
           }
         }
       }
@@ -386,7 +356,7 @@ const generateFamilyTreeSVG = (): string | null => {
   })
 
   if (rootMembers.length === 0) {
-    return null
+    return ''
   }
 
   // Sort root members by year of birth (oldest first)
