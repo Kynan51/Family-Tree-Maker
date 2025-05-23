@@ -148,12 +148,12 @@ export async function POST(request: Request) {
           {
             member_id: parent!.id,
             related_member_id: sibling.id,
-            type: "parent"
+            type: "child"
           },
           {
             member_id: sibling.id,
             related_member_id: parent!.id,
-            type: "child"
+            type: "parent"
           }
         ]);
       }
