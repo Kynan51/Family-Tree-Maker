@@ -25,13 +25,16 @@ export async function GET(request: Request) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Family Tree');
       worksheet.columns = [
-        { header: 'Name', key: 'name', width: 30 },
-        { header: 'Birth Year', key: 'birthYear', width: 15 },
-        { header: 'Death Year', key: 'deathYear', width: 15 },
-        { header: 'Parents', key: 'parents', width: 40 },
-        { header: 'Spouse', key: 'spouse', width: 30 },
-        { header: 'Children', key: 'children', width: 40 },
+        { header: '**Name**', key: 'name', width: 30 },
+        { header: '**Gender**', key: 'gender', width: 12 },
+        { header: '**Birth Year**', key: 'birthYear', width: 15 },
+        { header: '**Death Year**', key: 'deathYear', width: 15 },
+        { header: '**Parents**', key: 'parents', width: 40 },
+        { header: '**Spouse**', key: 'spouse', width: 30 },
+        { header: '**Children**', key: 'children', width: 40 },
       ];
+      // Make header row bold
+      worksheet.getRow(1).font = { bold: true };
       familyMembers.forEach((member) => {
         // Parents: relationships where this member is a child (type === 'parent')
         const parents = member.relationships
@@ -48,6 +51,7 @@ export async function GET(request: Request) {
         const spouse = spouseRel ? (memberMap[spouseRel.relatedMemberId]?.fullName || spouseRel.relatedMemberId) : '';
         worksheet.addRow({
           name: member.fullName || member.name,
+          gender: member.gender || '',
           birthYear: member.yearOfBirth || '',
           deathYear: member.isDeceased ? 'Deceased' : '',
           parents,
@@ -92,13 +96,16 @@ export async function GET(request: Request) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Family Tree');
     worksheet.columns = [
-      { header: 'Name', key: 'name', width: 30 },
-      { header: 'Birth Year', key: 'birthYear', width: 15 },
-      { header: 'Death Year', key: 'deathYear', width: 15 },
-      { header: 'Parents', key: 'parents', width: 40 },
-      { header: 'Spouse', key: 'spouse', width: 30 },
-      { header: 'Children', key: 'children', width: 40 },
+      { header: '**Name**', key: 'name', width: 30 },
+      { header: '**Gender**', key: 'gender', width: 12 },
+      { header: '**Birth Year**', key: 'birthYear', width: 15 },
+      { header: '**Death Year**', key: 'deathYear', width: 15 },
+      { header: '**Parents**', key: 'parents', width: 40 },
+      { header: '**Spouse**', key: 'spouse', width: 30 },
+      { header: '**Children**', key: 'children', width: 40 },
     ];
+    // Make header row bold
+    worksheet.getRow(1).font = { bold: true };
     familyMembers.forEach((member) => {
       // Parents: relationships where this member is a child (type === 'parent')
       const parents = member.relationships
@@ -114,6 +121,7 @@ export async function GET(request: Request) {
       const spouse = spouseRel ? (memberMap[spouseRel.relatedMemberId]?.fullName || spouseRel.relatedMemberId) : '';
       worksheet.addRow({
         name: member.fullName || member.name,
+        gender: member.gender || '',
         birthYear: member.yearOfBirth || '',
         deathYear: member.isDeceased ? 'Deceased' : '',
         parents,
