@@ -6,7 +6,7 @@ import { MaximizedContextProvider } from "@/components/family-tree-client-page"
 import { useMaximizedContext } from "@/components/maximized-context"
 
 function DemoFamilyTreeViewWrapper({ familyMembers, familyId }: { familyMembers: any, familyId: string }) {
-  const { isMaximized, setIsMaximized } = useMaximizedContext()g
+  const { isMaximized, setIsMaximized } = useMaximizedContext();
   return (
     <FamilyTreeView
       familyMembers={familyMembers}
@@ -15,7 +15,7 @@ function DemoFamilyTreeViewWrapper({ familyMembers, familyId }: { familyMembers:
       isMaximizedProp={isMaximized}
       setIsMaximizedProp={setIsMaximized}
     />
-  )
+  );
 }
 
 export default function DemoTreePage() {
