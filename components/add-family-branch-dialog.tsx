@@ -39,8 +39,8 @@ const AddFamilyBranchDialog: React.FC<AddFamilyBranchDialogProps> = ({ open, onC
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Add New Family Branch</DialogTitle>
       <DialogContent>
+        <DialogTitle>Add New Family Branch</DialogTitle>
         <TextField
           autoFocus
           margin="dense"
@@ -48,7 +48,6 @@ const AddFamilyBranchDialog: React.FC<AddFamilyBranchDialogProps> = ({ open, onC
           label="Branch Name"
           type="text"
           fullWidth
-          variant="standard"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -58,7 +57,6 @@ const AddFamilyBranchDialog: React.FC<AddFamilyBranchDialogProps> = ({ open, onC
           label="Location"
           type="text"
           fullWidth
-          variant="standard"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
         />
@@ -78,11 +76,13 @@ const AddFamilyBranchDialog: React.FC<AddFamilyBranchDialogProps> = ({ open, onC
             ))}
           </Select>
         </FormControl>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleAdd} disabled={!name || !location || !head} variant="contained" color="primary">
+            Add Branch
+          </Button>
+        </DialogActions>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleAdd}>Add</Button>
-      </DialogActions>
     </Dialog>
   )
 }
