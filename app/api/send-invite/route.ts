@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { getServerSession } from "@/lib/get-session"
-import { Resend } from "resend"
+// import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/tree/${familyId}`
 
     // Send email invitation
+    /*
     const { error: emailError } = await resend.emails.send({
       from: "Family Tree Maker <noreply@familytreemaker.com>",
       to: email,
@@ -81,10 +82,11 @@ export async function POST(request: Request) {
       console.error("Error sending email:", emailError)
       return new NextResponse("Failed to send invitation email", { status: 500 })
     }
+    */
 
     return new NextResponse("Invitation sent successfully", { status: 200 })
   } catch (error) {
     console.error("Error in send-invite:", error)
     return new NextResponse("Internal Server Error", { status: 500 })
   }
-} 
+}
