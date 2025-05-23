@@ -16,8 +16,19 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-      scrollRef.current.scrollLeft = 0
+      // Use requestAnimationFrame to ensure layout is ready before scrolling
+      const scrollToBottom = () => {
+        scrollRef.current!.scrollTop = scrollRef.current!.scrollHeight
+        scrollRef.current!.scrollLeft = 0
+      }
+      // Try scrolling after a short delay as well (for mobile rendering quirks)
+      scrollToBottom()
+      const raf = requestAnimationFrame(scrollToBottom)
+      const timeout = setTimeout(scrollToBottom, 100)
+      return () => {
+        cancelAnimationFrame(raf)
+        clearTimeout(timeout)
+      }
     }
   }, [familyMembers])
 
