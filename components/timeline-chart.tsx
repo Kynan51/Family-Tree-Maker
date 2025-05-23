@@ -11,7 +11,15 @@ interface TimelineChartProps {
 
 export function TimelineChart({ familyMembers }: TimelineChartProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollLeft = 0
+    }
+  }, [familyMembers])
 
   useEffect(() => {
     if (!svgRef.current || !familyMembers.length) return
@@ -20,7 +28,7 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
     const sortedMembers = [...familyMembers].sort((a, b) => a.yearOfBirth - b.yearOfBirth)
 
     const width = 2000
-    const height = 600
+    const height = 10000
     const margin = { top: 50, right: 50, bottom: 50, left: 100 }
 
     // Clear previous chart
@@ -137,7 +145,7 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
       .attr("dy", 60)
       .attr("text-anchor", "middle")
       .attr("fill", theme === "dark" ? "white" : "black")
-      .text((d) => d.fullName)
+      .text((d) => d.fullName || "")
 
     // Add birth year
     memberGroups
@@ -146,7 +154,7 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
       .attr("text-anchor", "middle")
       .attr("fill", theme === "dark" ? "#9ca3af" : "#4b5563")
       .attr("font-size", "0.8em")
-      .text((d) => d.yearOfBirth)
+      .text((d) => d.yearOfBirth != null ? d.yearOfBirth : "")
 
     // Add connecting lines to timeline
     memberGroups
@@ -168,8 +176,12 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
   }, [familyMembers, theme])
 
   return (
-    <div className="w-full h-full overflow-auto">
-      <svg ref={svgRef} />
+    <div
+      ref={scrollRef}
+      className="timeline-scroll-area w-full h-full max-h-full max-w-full overflow-x-auto overflow-y-auto"
+      style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100vw' }}
+    >
+      <svg ref={svgRef} style={{ minWidth: 2000, minHeight: 2000, display: 'block' }} />
     </div>
   )
 }

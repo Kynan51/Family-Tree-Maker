@@ -2,6 +2,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ClientLayout } from "@/components/client-layout"
 import { MaximizedContextProvider } from "@/components/maximized-context";
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -42,6 +43,7 @@ export default function RootLayout({
             {children}
           </ClientLayout>
         </MaximizedContextProvider>
+        <Analytics />
       </body>
     </html>
   )

@@ -61,8 +61,31 @@ export async function POST(req: NextRequest) {
     }
     // Log the full incoming members array for debugging
     console.log('[IMPORT] Incoming members payload:', JSON.stringify(members, null, 2));
+    // Deduplicate members array before inserting
+    // Improved deduplication: include sorted parent names in the key
+    const uniqueMemberKey = (m: any) => {
+      const parents = (typeof m.parents === 'string' && m.parents.trim() !== '')
+        ? m.parents.split(',').map((n: string) => n.trim().toLowerCase()).sort().join(',')
+        : '';
+      return `${normalizeName(m.full_name)}|${m.yearOfBirth}|${(m.livingPlace || m.living_place || 'Unknown').trim().toLowerCase()}|${parents}`;
+    };
+    const seenKeys = new Set<string>();
+    const dedupedMembers: any[] = [];
+    members.forEach((m) => {
+      const key = uniqueMemberKey(m);
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        dedupedMembers.push(m);
+      }
+    });
+    // Update nameToId to use deduped members only
+    Object.keys(nameToId).forEach(norm => { delete nameToId[norm]; });
+    dedupedMembers.forEach((m: any) => {
+      const norm = normalizeName(m.full_name);
+      nameToId[norm] = crypto.randomUUID();
+    });
     // Insert all members (prevent duplicates by checking DB first)
-    for (const m of members) {
+    for (const m of dedupedMembers) {
       // Log each member's relationship fields for debugging
       console.log(`[IMPORT] Member: ${m.full_name} | Parents: ${m.parents} | Spouses: ${m.spouses} | Children: ${m.children}`);
       const normName = normalizeName(m.full_name);
@@ -127,14 +150,14 @@ export async function POST(req: NextRequest) {
       dbNameToId[(m.full_name || '').trim().toLowerCase()] = m.id
     })
     // Log relationship fields for each member before upsert
-    for (const m of members) {
+    for (const m of dedupedMembers) {
       console.log(`[IMPORT DEBUG] Member: ${m.full_name} | Parents: '${m.parents}' | Spouses: '${m.spouses}' | Children: '${m.children}'`);
     }
     // Batch up all relationships and upsert them after all members are created
     const relationshipsToInsert: any[] = [];
     const skippedRelationships: { member: string, related: string, type: string }[] = [];
     let totalRelationships = 0;
-    for (const m of members) {
+    for (const m of dedupedMembers) {
       const memberId = dbNameToId[normalizeName(m.full_name)];
       // Parents
       if (m.parents && m.parents.trim() !== "") {
@@ -208,7 +231,7 @@ export async function POST(req: NextRequest) {
     }
     // Logging summary
     console.info(`[IMPORT] Family '${name}' imported by user '${userId}'.`);
-    console.info(`[IMPORT] Members imported: ${members.length}`);
+    console.info(`[IMPORT] Members imported: ${dedupedMembers.length}`);
     console.info(`[IMPORT] Relationships created: ${uniqueRelationships.length} (raw: ${totalRelationships})`);
     if (skippedRelationships.length > 0) {
       console.warn(`[IMPORT] Skipped relationships due to missing members:`, skippedRelationships);

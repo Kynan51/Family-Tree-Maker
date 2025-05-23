@@ -107,21 +107,22 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
       let failCount = 0
       const nameToId: Record<string, string> = {}
       const importedMembers: any[] = []
-      for (const row of rows) {
+      for (const row of rows as any[]) {
         try {
-          const rowObj = Object.fromEntries(headers.map((h, i) => [h, row[i]]))
+          const rowArr = row as any[];
+          const rowObj = Object.fromEntries(headers.map((h, i) => [h, rowArr[i]]));
           // Accept various is_deceased values
-          let isDeceased = false
+          let isDeceased = false;
           if (typeof rowObj.is_deceased === 'string') {
-            const val = rowObj.is_deceased.trim().toLowerCase()
-            isDeceased = val === 'yes' || val === 'true' || val === '1'
+            const val = rowObj.is_deceased.trim().toLowerCase();
+            isDeceased = val === 'yes' || val === 'true' || val === '1';
           } else if (typeof rowObj.is_deceased === 'number') {
-            isDeceased = rowObj.is_deceased === 1
+            isDeceased = rowObj.is_deceased === 1;
           } else if (typeof rowObj.is_deceased === 'boolean') {
-            isDeceased = rowObj.is_deceased
+            isDeceased = rowObj.is_deceased;
           }
           // Check if member exists in DB (primary match)
-          const supabase = createAdminClient()
+          const supabase = createAdminClient();
           let { data: existing, error: findError } = await supabase
             .from('family_members')
             .select('id')
@@ -129,22 +130,22 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             .eq('year_of_birth', Number(rowObj.year_of_birth))
             .eq('living_place', rowObj.living_place)
             .eq('family_id', familyId)
-            .maybeSingle()
-          let id = existing?.id
+            .maybeSingle();
+          let id = existing?.id;
           // If not found, try to match by year_of_birth and relationships
           if (!id) {
-            const yearOfBirth = Number(rowObj.year_of_birth)
-            const relTypes = ["parents", "spouses", "children"]
-            let possibleIds: string[] = []
+            const yearOfBirth = Number(rowObj.year_of_birth);
+            const relTypes = ["parents", "spouses", "children"];
+            let possibleIds: string[] = [];
             for (const relType of relTypes) {
-              const relNames = (typeof rowObj[relType] === 'string') ? rowObj[relType].split(',').map((n: string) => n.trim()).filter(Boolean) : []
+              const relNames = (typeof rowObj[relType] === 'string') ? rowObj[relType].split(',').map((n: string) => n.trim()).filter(Boolean) : [];
               for (const relName of relNames) {
                 // Find related member by name in the same family
                 const { data: relatedMembers, error: relError } = await supabase
                   .from('family_members')
                   .select('id')
                   .eq('full_name', relName)
-                  .eq('family_id', familyId)
+                  .eq('family_id', familyId);
                 if (relatedMembers && relatedMembers.length > 0) {
                   for (const related of relatedMembers) {
                     // Find relationships where related_member_id = related.id and year_of_birth matches
@@ -152,7 +153,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
                       .from('relationships')
                       .select('member_id')
                       .eq('related_member_id', related.id)
-                      .eq('type', relType.slice(0, -1)) // parent/child/spouse
+                      .eq('type', relType.slice(0, -1)); // parent/child/spouse
                     if (rels && rels.length > 0) {
                       for (const rel of rels) {
                         // Get the member's year_of_birth
@@ -161,8 +162,8 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
                           .select('id,year_of_birth')
                           .eq('id', rel.member_id)
                           .eq('year_of_birth', yearOfBirth)
-                          .maybeSingle()
-                        if (m && m.id) possibleIds.push(m.id)
+                          .maybeSingle();
+                        if (m && m.id) possibleIds.push(m.id);
                       }
                     }
                   }
@@ -171,10 +172,10 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             }
             // If exactly one possible match, use it
             if (possibleIds.length === 1) {
-              id = possibleIds[0]
+              id = possibleIds[0];
             }
           }
-          if (!id) id = crypto.randomUUID()
+          if (!id) id = crypto.randomUUID();
           const member = {
             id,
             name: rowObj.full_name,
@@ -189,17 +190,19 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             updatedAt: new Date().toISOString(),
             familyId: familyId,
             occupation: rowObj.occupation || '',
-          }
+            gender: rowObj.gender || 'unknown', // Add gender property
+            generation: rowObj.generation || 0, // Add generation property (default 0)
+          };
           if (existing?.id || (id && id !== member.id)) {
-            await updateFamilyMember(member)
+            await updateFamilyMember(member);
           } else if (!existing?.id && id === member.id) {
-            await createFamilyMember(member)
+            await createFamilyMember(member);
           }
-          nameToId[rowObj.full_name] = id
-          importedMembers.push({ ...member, _rowObj: rowObj })
-          successCount++
+          nameToId[rowObj.full_name] = id;
+          importedMembers.push({ ...member, _rowObj: rowObj });
+          successCount++;
         } catch (err) {
-          failCount++
+          failCount++;
         }
       }
       // Second pass: create relationships
@@ -268,11 +271,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
 
   const toggleMaximize = () => {
     console.log('DEBUG: Maximize button clicked. Current isMaximized:', isMaximized);
-    setIsMaximized((prev: boolean) => {
-      const next = !prev;
-      console.log('DEBUG: Setting isMaximized to', next);
-      return next;
-    });
+    setIsMaximized(!isMaximized); // Fix: pass boolean, not function
   }
 
   const handleDetectSiblings = async () => {
@@ -338,7 +337,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             </Button>
           </div>
           <ExportButton familyId={familyId} />
-          <ShareButton familyId={familyId} familyName={familyMembers[0]?.familyName || "Family Tree"} />
+          <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={false} />
           {isAdmin && (
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">
@@ -413,7 +412,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
         >
           {view === "tree" ? (
             familyMembers && familyMembers.length > 0 ? (
-              <FamilyTreeD3 data={familyMembers} isAdmin={isAdmin} familyId={familyId} />
+              <FamilyTreeD3 data={familyMembers.map(m => ({ ...m, generation: (m as any).generation ?? 0 }))} isAdmin={isAdmin} familyId={familyId} />
             ) : (
               <div className="flex items-center justify-center h-full w-full text-lg text-muted-foreground">No family tree available</div>
             )

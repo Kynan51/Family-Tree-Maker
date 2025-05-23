@@ -39,8 +39,11 @@ export function Header() {
   const pathname = usePathname()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(session?.notifications || []);
-  const [unreadNotifications, setUnreadNotifications] = useState(notifications.filter(n => !n.read).length);
+  // Fix: notifications are not part of session, so default to empty array
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(
+    notifications.filter((n: any) => !n.read).length
+  );
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
@@ -52,12 +55,18 @@ export function Header() {
           const supabase = createClient();
           const { data, error } = await supabase
             .from("users")
-            .select("*")
+            .select("id, name, email, photo_url, role")
             .eq("id", session.user.id)
             .single();
 
           if (!error && data) {
-            setUserProfile(data);
+            setUserProfile({
+              id: String(data.id),
+              name: String(data.name),
+              email: String(data.email),
+              photoUrl: data.photo_url ? String(data.photo_url) : undefined,
+              role: String(data.role),
+            });
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -66,7 +75,6 @@ export function Header() {
         }
       }
     };
-
     fetchUserProfile();
   }, [session?.user?.id]);
 
@@ -79,24 +87,26 @@ export function Header() {
     }
   };
 
-  const handleMarkNotificationAsRead = async (notificationId) => {
+  // Fix: add types for parameters
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
     try {
       await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
-      setUnreadNotifications(prev => prev - 1);
-      setNotifications((prev) => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
+      setUnreadNotifications((prev: number) => prev - 1);
+      setNotifications((prev: any[]) => prev.map((n: any) => n.id === notificationId ? { ...n, read: true } : n));
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
   };
 
   const isAuthenticated = !!session?.user || !!session;
-  const user = session?.user || session;
-  const userName = userProfile?.name || user?.name || "User";
-  const userEmail = userProfile?.email || user?.email || "";
-  const userPhotoUrl = userProfile?.photoUrl || user?.photoUrl || "/placeholder.svg?height=32&width=32";
+  const user = session?.user || {};
+  // Fix: safely access user properties (name, email, photoUrl, role)
+  const userName = userProfile?.name || (user as any).name || "User";
+  const userEmail = userProfile?.email || (user as any).email || "";
+  const userPhotoUrl = userProfile?.photoUrl || (user as any).photoUrl || "/placeholder.svg?height=32&width=32";
   const userInitials = userName ? userName.substring(0, 2).toUpperCase() : "U";
 
-  const userRole = userProfile?.role || user?.role || "viewer"
+  const userRole = userProfile?.role || (user as any).role || "viewer"
   const isAdmin = userRole === "admin" || userRole === "super_admin"
   const isSuperAdmin = userRole === "super_admin"
 
