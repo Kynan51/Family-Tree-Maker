@@ -179,7 +179,7 @@ export function TimelineChart({ familyMembers }: TimelineChartProps) {
     <div
       ref={scrollRef}
       className="timeline-scroll-area w-full h-full max-h-full max-w-full overflow-x-auto overflow-y-auto"
-      style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100vw' }}
+      style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}
     >
       <svg ref={svgRef} style={{ minWidth: 2000, minHeight: 2000, display: 'block' }} />
     </div>

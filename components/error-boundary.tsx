@@ -16,16 +16,31 @@ export function ErrorBoundary({ children }: ErrorBoundaryProps) {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    const errorHandler = (event: ErrorEvent) => {
-      const error = event.error || new Error(event.message || "Unknown error")
+    const errorHandler = (event: ErrorEvent | PromiseRejectionEvent) => {
+      let errorObj: Error
+      if ("reason" in event && event.reason instanceof Error) {
+        errorObj = event.reason
+      } else if ("error" in event && event.error instanceof Error) {
+        errorObj = event.error
+      } else {
+        const message =
+          (event as any).reason?.message ||
+          (event as any).error?.message ||
+          ("message" in event ? (event as ErrorEvent).message : undefined) ||
+          JSON.stringify(event) ||
+          "Unknown error"
+        errorObj = new Error(message)
+      }
       setHasError(true)
-      setError(error)
+      setError(errorObj)
     }
 
     window.addEventListener("error", errorHandler)
+    window.addEventListener("unhandledrejection", errorHandler)
 
     return () => {
       window.removeEventListener("error", errorHandler)
+      window.removeEventListener("unhandledrejection", errorHandler)
     }
   }, [])
 
