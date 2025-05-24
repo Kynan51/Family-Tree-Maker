@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState, lazy, Suspense, useContext } from "react"
+import { useEffect, useState, lazy, Suspense } from "react"
 import { usePathname } from "next/navigation"
 import { Toaster } from "@/components/ui/toaster"
 import { SupabaseAuthProvider } from "@/components/supabase-auth-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ThemeProvider } from "@/components/theme-provider"
-import { MaximizedContext } from "@/components/maximized-context"
+import { MaximizedContext, useMaximizedContext } from "@/components/maximized-context"
 
 // Lazy load heavy components
 const Header = lazy(() => import("@/components/header").then(mod => ({ default: mod.Header })))
@@ -15,7 +15,7 @@ const Footer = lazy(() => import("@/components/footer").then(mod => ({ default: 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const { isMaximized } = useContext(MaximizedContext)
+  const { isMaximized } = useMaximizedContext()
 
   useEffect(() => {
     setMounted(true)
@@ -39,11 +39,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <ErrorBoundary>
           <div className="min-h-screen flex flex-col bg-background">
             <Suspense fallback={<div className="h-14 bg-background/95 backdrop-blur" />}>
-              {console.log("DEBUG: Rendering Header. isMaximized:", isMaximized)}
+              {/* DEBUG: Rendering Header. isMaximized: {isMaximized} */}
               {!isMaximized && <Header />}
             </Suspense>
             <main className="flex-1 relative">
-              <div className="container mx-auto px-4 h-full">
+              <div className="container mx-auto px-px sm:px-4 h-full">
                 {children}
               </div>
             </main>
