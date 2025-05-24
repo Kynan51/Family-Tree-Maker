@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
     });
     // Insert all members (prevent duplicates by checking DB first)
     for (const m of dedupedMembers) {
-      // Log each member's relationship fields for debugging
-      console.log(`[IMPORT] Member: ${m.full_name} | Parents: ${m.parents} | Spouses: ${m.spouses} | Children: ${m.children}`);
+      // Debug: log the raw member object to see property names and values
+      console.log('[IMPORT DEBUG] Raw member object:', m);
       const normName = normalizeName(m.full_name);
       let id = nameToId[normName];
       let existingId = null;
@@ -105,33 +105,63 @@ export async function POST(req: NextRequest) {
         nameToId[normName] = existingId;
         console.log(`[IMPORT] Skipping insert for existing member: ${m.full_name} (ID: ${existingId})`);
       } else {
+        // Robustly extract all fields
+        // --- FIX: Normalize isDeceased field robustly for all common values and Excel column variants ---
         let isDeceased = false;
-        if (typeof m.isDeceased === 'boolean') {
-          isDeceased = m.isDeceased;
-        } else if (typeof m.is_deceased === 'string') {
-          const val = m.is_deceased.trim().toLowerCase();
-          isDeceased = val === 'yes' || val === 'true' || val === '1';
-        } else if (typeof m.is_deceased === 'number') {
-          isDeceased = m.is_deceased === 1;
+        const yesValues = ['yes', 'true', '1', 'y', 't'];
+        const noValues = ['no', 'false', '0', 'n', 'f'];
+        const getDeceasedValue = (val: any) => {
+          if (typeof val === 'boolean') return val;
+          if (typeof val === 'number') return val === 1;
+          if (typeof val === 'string') {
+            const v = val.trim().toLowerCase();
+            if (yesValues.includes(v)) return true;
+            if (noValues.includes(v)) return false;
+          }
+          return false;
+        };
+        const deceasedRaw = m.isDeceased ?? m.is_deceased ?? m["Is Deceased"] ?? m["is deceased"];
+        isDeceased = getDeceasedValue(deceasedRaw);
+        // Gender
+        let gender: "male" | "female" | "other" | "unknown" = "unknown";
+        if (typeof m.gender === 'string' && ["male", "female", "other", "unknown"].includes(m.gender.toLowerCase())) {
+          gender = m.gender.toLowerCase() as "male" | "female" | "other" | "unknown";
+        } else if (typeof m.Gender === 'string' && ["male", "female", "other", "unknown"].includes(m.Gender.toLowerCase())) {
+          gender = m.Gender.toLowerCase() as "male" | "female" | "other" | "unknown";
+        }
+        // Occupation
+        let occupation = m.occupation || '';
+        // Living Place
+        let livingPlace = m.livingPlace || m.living_place || 'Unknown';
+        // Year of Death
+        let yearOfDeath = null;
+        if (m.yearOfDeath !== undefined && m.yearOfDeath !== null && m.yearOfDeath !== '') {
+          yearOfDeath = Number(m.yearOfDeath);
+          if (isNaN(yearOfDeath)) yearOfDeath = null;
+        } else if (m.deathYear !== undefined && m.deathYear !== null && m.deathYear !== '') {
+          yearOfDeath = Number(m.deathYear);
+          if (isNaN(yearOfDeath)) yearOfDeath = null;
+        } else if (m.year_of_death !== undefined && m.year_of_death !== null && m.year_of_death !== '') {
+          yearOfDeath = Number(m.year_of_death);
+          if (isNaN(yearOfDeath)) yearOfDeath = null;
         }
         const maritalStatus = typeof m.maritalStatus === 'string' && ["Single", "Married", "Divorced", "Widowed"].includes(m.maritalStatus) ? m.maritalStatus : "Single";
-        const gender = typeof m.gender === 'string' && ["male", "female", "other", "unknown"].includes(m.gender) ? m.gender : "unknown";
         const yearOfBirth = m.yearOfBirth;
-        // Insert only if not exists
         await createFamilyMember({
           id,
           name: m.full_name,
           fullName: m.full_name,
           yearOfBirth: yearOfBirth,
-          livingPlace: m.livingPlace || m.living_place || 'Unknown',
-          isDeceased,
+          yearOfDeath: yearOfDeath,
+          livingPlace: livingPlace,
+          isDeceased: isDeceased,
           maritalStatus,
           photoUrl: m.photoUrl || m.photo_url || null,
           relationships: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           familyId: String(family.id),
-          occupation: m.occupation || '',
+          occupation: occupation,
           gender,
         }, { skipRelationships: true });
       }

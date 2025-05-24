@@ -140,10 +140,39 @@ export default function CreateFamilyPage() {
       }
       // Normalize headers to lowercase and remove spaces for robust mapping
       const lowerHeaders = (headers as string[]).map(h => h.toLowerCase().replace(/\s+/g, ''))
+      // Map original headers to normalized headers for lookup
+      const headerMap: Record<string, string> = {};
+      (headers as string[]).forEach((h, i) => {
+        const norm = h.toLowerCase().replace(/\s+/g, '');
+        headerMap[norm] = h;
+      });
+      // Helper to get value by possible column names
+      const getCol = (objRaw: any, ...names: string[]) => {
+        for (const n of names) {
+          if (objRaw[n] !== undefined) return objRaw[n];
+        }
+        return undefined;
+      };
       let missingNameCount = 0
       let missingYearCount = 0
       const members: any[] = rows.map((row, idx, allRows) => {
         const objRaw = Object.fromEntries(lowerHeaders.map((h, i) => [h, (row as any[])[i]]))
+        // Robustly map is_deceased from all common column names
+        const deceasedRaw = getCol(objRaw, "isdeceased", "is_deceased", "is deceased");
+        // Normalize deceased value
+        const yesValues = ['yes', 'true', '1', 'y', 't'];
+        const noValues = ['no', 'false', '0', 'n', 'f'];
+        let isDeceased: boolean = false;
+        if (typeof deceasedRaw === 'boolean') isDeceased = deceasedRaw;
+        else if (typeof deceasedRaw === 'number') isDeceased = deceasedRaw === 1;
+        else if (typeof deceasedRaw === 'string') {
+          const v = deceasedRaw.trim().toLowerCase();
+          if (yesValues.includes(v)) isDeceased = true;
+          else if (noValues.includes(v)) isDeceased = false;
+        }
+        // Fallback: if yearOfDeath is present, set isDeceased true
+        const yearOfDeath = objRaw["deathyear"] || objRaw["yearofdeath"] || objRaw["death_year"] || "";
+        if (!isDeceased && yearOfDeath && String(yearOfDeath).trim() !== '') isDeceased = true;
         let baseName = objRaw["name"] || objRaw["fullname"] || objRaw["full_name"] || ""
         if (typeof baseName === "string") baseName = baseName.trim()
         if (!baseName) {
@@ -157,12 +186,10 @@ export default function CreateFamilyPage() {
           yearOfBirthNum = 1970 + idx
           missingYearCount++
         }
-        const yearOfDeath = objRaw["deathyear"] || objRaw["yearofdeath"] || objRaw["death_year"] || ""
         const livingPlace = objRaw["livingplace"] || objRaw["living_place"] || objRaw["place"] || objRaw["location"] || "Unknown"
         const maritalStatus = objRaw["maritalstatus"] || objRaw["marital_status"] || objRaw["status"] || "Single"
         const occupation = objRaw["occupation"] || ""
         const gender = objRaw["gender"] || "unknown"
-        const isDeceased = yearOfDeath && String(yearOfDeath).trim() !== '' ? true : false
         // Always map relationship fields as comma-separated strings (never arrays)
         // Use only lowercased, spaceless keys for relationship fields
         let parents = typeof objRaw["parents"] === 'string' ? objRaw["parents"].trim() : ''

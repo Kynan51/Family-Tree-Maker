@@ -21,9 +21,10 @@ interface FamilyTreeViewProps {
   familyId: string
   isMaximizedProp?: boolean
   setIsMaximizedProp?: (v: boolean) => void
+  isPublic?: boolean
 }
 
-export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedProp, setIsMaximizedProp }: FamilyTreeViewProps) {
+export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedProp, setIsMaximizedProp, isPublic }: FamilyTreeViewProps) {
   const [view, setView] = useState<"tree" | "timeline">("tree")
   const [zoom, setZoom] = useState(1)
   const isMaximized = !!isMaximizedProp;
@@ -111,15 +112,17 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
         try {
           const rowArr = row as any[];
           const rowObj = Object.fromEntries(headers.map((h, i) => [h, rowArr[i]]));
-          // Accept various is_deceased values
+          // Robustly extract is_deceased from all common column names
+          const deceasedRaw = rowObj.is_deceased ?? rowObj.isDeceased ?? rowObj["Is Deceased"] ?? rowObj["is deceased"];
+          const yesValues = ['yes', 'true', '1', 'y', 't'];
+          const noValues = ['no', 'false', '0', 'n', 'f'];
           let isDeceased = false;
-          if (typeof rowObj.is_deceased === 'string') {
-            const val = rowObj.is_deceased.trim().toLowerCase();
-            isDeceased = val === 'yes' || val === 'true' || val === '1';
-          } else if (typeof rowObj.is_deceased === 'number') {
-            isDeceased = rowObj.is_deceased === 1;
-          } else if (typeof rowObj.is_deceased === 'boolean') {
-            isDeceased = rowObj.is_deceased;
+          if (typeof deceasedRaw === 'boolean') isDeceased = deceasedRaw;
+          else if (typeof deceasedRaw === 'number') isDeceased = deceasedRaw === 1;
+          else if (typeof deceasedRaw === 'string') {
+            const v = deceasedRaw.trim().toLowerCase();
+            if (yesValues.includes(v)) isDeceased = true;
+            else if (noValues.includes(v)) isDeceased = false;
           }
           // Check if member exists in DB (primary match)
           const supabase = createAdminClient();
@@ -337,7 +340,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             </Button>
           </div>
           <ExportButton familyId={familyId} />
-          <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={false} />
+          <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={isPublic ?? false} />
           {isAdmin && (
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">

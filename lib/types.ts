@@ -16,6 +16,7 @@ export interface FamilyMember {
   updatedAt: string
   familyId: string
   occupation?: string
+  yearOfDeath?: number | null // Add yearOfDeath for deceased members
 }
 
 export interface Relationship {

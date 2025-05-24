@@ -17,20 +17,29 @@ export function ErrorBoundary({ children }: ErrorBoundaryProps) {
 
   useEffect(() => {
     const errorHandler = (event: ErrorEvent | PromiseRejectionEvent) => {
-      let errorObj: Error
+      let errorObj: Error | null = null
+
       if ("reason" in event && event.reason instanceof Error) {
         errorObj = event.reason
       } else if ("error" in event && event.error instanceof Error) {
         errorObj = event.error
-      } else {
-        const message =
-          (event as any).reason?.message ||
-          (event as any).error?.message ||
-          ("message" in event ? (event as ErrorEvent).message : undefined) ||
-          JSON.stringify(event) ||
-          "Unknown error"
-        errorObj = new Error(message)
+      } else if ("message" in event && typeof event.message === "string" && event.message !== "") {
+        errorObj = new Error(event.message)
+      } else if ("reason" in event && typeof event.reason === "string") {
+        errorObj = new Error(event.reason)
       }
+
+      // Ignore generic trusted events with no useful info
+      if (
+        !errorObj ||
+        errorObj.message === "" ||
+        errorObj.message === "[object Object]" ||
+        errorObj.message === '{"isTrusted":true}' ||
+        errorObj.message === "Unknown error"
+      ) {
+        return
+      }
+
       setHasError(true)
       setError(errorObj)
     }

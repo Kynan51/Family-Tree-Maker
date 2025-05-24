@@ -2,6 +2,8 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { FamilyTreeView } from "@/components/family-tree-view";
 import { useMaximizedContext } from "@/components/maximized-context";
+import type { Family } from "@/lib/types";
+import type { FamilyMember } from "@/lib/types";
 
 export const MaximizedContext = createContext({
   isMaximized: false,
@@ -17,7 +19,12 @@ export function MaximizedContextProvider({ children }: { children: React.ReactNo
   );
 }
 
-export default function FamilyTreeClientPage({ family, familyMembers, isAdmin, familyId }) {
+export default function FamilyTreeClientPage({ family, familyMembers, isAdmin, familyId }: {
+  family: Family,
+  familyMembers: FamilyMember[],
+  isAdmin: boolean,
+  familyId: string
+}) {
   const { isMaximized, setIsMaximized } = useMaximizedContext();
   useEffect(() => {
     console.log('DEBUG: FamilyTreeClientPage render. isMaximized:', isMaximized);
@@ -33,6 +40,7 @@ export default function FamilyTreeClientPage({ family, familyMembers, isAdmin, f
         familyId={familyId}
         isMaximizedProp={isMaximized}
         setIsMaximizedProp={setIsMaximized}
+        isPublic={family.isPublic}
       />
     </>
   );

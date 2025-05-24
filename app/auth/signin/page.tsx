@@ -18,8 +18,8 @@ export default function SignIn() {
   const callbackUrl = searchParams?.get("callbackUrl") || "/tree"
   const error = searchParams?.get("error")
 
-  const [email, setEmail] = useState("test@example.com")
-  const [password, setPassword] = useState("password")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState(error || "")
 

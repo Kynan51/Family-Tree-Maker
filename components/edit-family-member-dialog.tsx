@@ -149,11 +149,12 @@ export function EditFamilyMemberDialog({
     setIsSubmitting(true);
     try {
       const relationships: Relationship[] = [];
+      // FIX: Swap the types for correct directionality
       selectedParents.forEach((parentId) => {
-        relationships.push({ type: "parent", relatedMemberId: parentId });
+        relationships.push({ type: "child", relatedMemberId: parentId });
       });
       selectedChildren.forEach((childId) => {
-        relationships.push({ type: "child", relatedMemberId: childId });
+        relationships.push({ type: "parent", relatedMemberId: childId });
       });
       selectedSpouse.forEach((spouseId) => {
         relationships.push({ type: "spouse", relatedMemberId: spouseId });

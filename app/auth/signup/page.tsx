@@ -33,17 +33,32 @@ export default function SignUp() {
   const [phonePassword, setPhonePassword] = useState("")
   const [confirmPhonePassword, setConfirmPhonePassword] = useState("")
 
-  const validateEmail = (email) => {
+  interface ValidateEmail {
+    (email: string): boolean
+  }
+
+  const validateEmail: ValidateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return re.test(email)
   }
 
-  const validatePhone = (phone) => {
+  interface ValidatePhone {
+    (phone: string): boolean
+  }
+
+  const validatePhone: ValidatePhone = (phone) => {
     const re = /^\+[1-9]\d{1,14}$/
     return re.test(phone)
   }
 
-  const handleEmailSubmit = async (e) => {
+  interface EmailSignUpPayload {
+    fullName: string
+    dateOfBirth: string
+  }
+
+  interface HandleEmailSubmitEvent extends React.FormEvent<HTMLFormElement> {}
+
+  const handleEmailSubmit = async (e: HandleEmailSubmitEvent): Promise<void> => {
     e.preventDefault()
     setIsLoading(true)
     setErrorMessage("")
@@ -76,16 +91,23 @@ export default function SignUp() {
       await signUp(email, password, {
         fullName,
         dateOfBirth,
-      })
+      } as EmailSignUpPayload)
       router.push("/auth/verify-email")
     } catch (error) {
       console.error("Sign up error:", error)
-      setErrorMessage(error.message || "Failed to sign up")
+      setErrorMessage((error as Error & { message?: string }).message || "Failed to sign up")
       setIsLoading(false)
     }
   }
 
-  const handlePhoneSubmit = async (e) => {
+  interface PhoneSignUpPayload {
+    fullName: string
+    dateOfBirth: string
+  }
+
+  interface HandlePhoneSubmitEvent extends React.FormEvent<HTMLFormElement> {}
+
+  const handlePhoneSubmit = async (e: HandlePhoneSubmitEvent): Promise<void> => {
     e.preventDefault()
     setIsLoading(true)
     setErrorMessage("")
@@ -119,12 +141,12 @@ export default function SignUp() {
       // await signUpWithPhone(phone, phonePassword, {
       //   fullName: phoneFullName,
       //   dateOfBirth: phoneDateOfBirth,
-      // })
+      // } as PhoneSignUpPayload)
       setErrorMessage("Phone signup is not implemented yet")
       setIsLoading(false)
     } catch (error) {
       console.error("Phone sign up error:", error)
-      setErrorMessage(error.message || "Failed to sign up with phone")
+      setErrorMessage((error as Error & { message?: string }).message || "Failed to sign up with phone")
       setIsLoading(false)
     }
   }

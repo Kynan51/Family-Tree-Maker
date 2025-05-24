@@ -25,13 +25,17 @@ export async function GET(request: Request) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Family Tree');
       worksheet.columns = [
-        { header: '**Name**', key: 'name', width: 30 },
-        { header: '**Gender**', key: 'gender', width: 12 },
-        { header: '**Birth Year**', key: 'birthYear', width: 15 },
-        { header: '**Death Year**', key: 'deathYear', width: 15 },
-        { header: '**Parents**', key: 'parents', width: 40 },
-        { header: '**Spouse**', key: 'spouse', width: 30 },
-        { header: '**Children**', key: 'children', width: 40 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Gender', key: 'gender', width: 12 },
+        { header: 'Birth Year', key: 'birthYear', width: 15 },
+        { header: 'Is Deceased', key: 'isDeceased', width: 15 },
+        { header: 'Death Year', key: 'deathYear', width: 15 },
+        { header: 'Living Place', key: 'livingPlace', width: 30 },
+        { header: 'Occupation', key: 'occupation', width: 20 },
+        // { header: 'Education', key: 'education', width: 20 },
+        { header: 'Parents', key: 'parents', width: 40 },
+        { header: 'Spouse', key: 'spouse', width: 30 },
+        { header: 'Children', key: 'children', width: 40 },
       ];
       // Make header row bold
       worksheet.getRow(1).font = { bold: true };
@@ -53,7 +57,10 @@ export async function GET(request: Request) {
           name: member.fullName || member.name,
           gender: member.gender || '',
           birthYear: member.yearOfBirth || '',
-          deathYear: member.isDeceased ? 'Deceased' : '',
+          isDeceased: member.isDeceased ? 'Yes' : 'No',
+          deathYear: member.yearOfDeath || '',
+          livingPlace: member.livingPlace || '',
+          occupation: member.occupation || '',
           parents,
           spouse,
           children,
@@ -96,13 +103,16 @@ export async function GET(request: Request) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Family Tree');
     worksheet.columns = [
-      { header: '**Name**', key: 'name', width: 30 },
-      { header: '**Gender**', key: 'gender', width: 12 },
-      { header: '**Birth Year**', key: 'birthYear', width: 15 },
-      { header: '**Death Year**', key: 'deathYear', width: 15 },
-      { header: '**Parents**', key: 'parents', width: 40 },
-      { header: '**Spouse**', key: 'spouse', width: 30 },
-      { header: '**Children**', key: 'children', width: 40 },
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Gender', key: 'gender', width: 12 },
+      { header: 'Birth Year', key: 'birthYear', width: 15 },
+      { header: 'Is Deceased', key: 'isDeceased', width: 15 },
+      { header: 'Death Year', key: 'deathYear', width: 15 },
+      { header: 'Living Place', key: 'livingPlace', width: 30 },
+      { header: 'Occupation', key: 'occupation', width: 20 },
+      { header: 'Parents', key: 'parents', width: 40 },
+      { header: 'Spouse', key: 'spouse', width: 30 },
+      { header: 'Children', key: 'children', width: 40 },
     ];
     // Make header row bold
     worksheet.getRow(1).font = { bold: true };
@@ -123,7 +133,10 @@ export async function GET(request: Request) {
         name: member.fullName || member.name,
         gender: member.gender || '',
         birthYear: member.yearOfBirth || '',
-        deathYear: member.isDeceased ? 'Deceased' : '',
+        isDeceased: member.isDeceased ? 'Yes' : 'No',
+        deathYear: member.yearOfDeath || '',
+        livingPlace: member.livingPlace || '',
+        occupation: member.occupation || '',
         parents,
         spouse,
         children,

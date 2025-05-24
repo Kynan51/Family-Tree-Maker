@@ -40,7 +40,7 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         fullName: member.full_name,
         yearOfBirth: member.year_of_birth,
         livingPlace: member.living_place,
-        isDeceased: member.is_deceased,
+        isDeceased: Boolean(member.is_deceased),
         maritalStatus: member.marital_status,
         photoUrl: member.photo_url,
         relationships: [],
@@ -49,6 +49,7 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         familyId: member.family_id,
         occupation: member.occupation,
         gender: member.gender || 'unknown',
+        name: member.full_name || member.name || '',
       }))
     }
 
@@ -68,7 +69,7 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         fullName: member.full_name,
         yearOfBirth: member.year_of_birth,
         livingPlace: member.living_place,
-        isDeceased: member.is_deceased,
+        isDeceased: Boolean(member.is_deceased),
         maritalStatus: member.marital_status,
         photoUrl: member.photo_url,
         relationships: memberRelationships,
@@ -77,6 +78,8 @@ export async function getFamilyMembers(familyId?: string): Promise<FamilyMember[
         familyId: member.family_id,
         occupation: member.occupation,
         gender: member.gender || 'unknown',
+        yearOfDeath: member.year_of_death,
+        name: member.full_name || member.name || '',
       }
     })
   } catch (error) {
@@ -111,7 +114,7 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
         fullName: member.full_name,
         yearOfBirth: member.year_of_birth,
         livingPlace: member.living_place,
-        isDeceased: member.is_deceased,
+        isDeceased: Boolean(member.is_deceased),
         maritalStatus: member.marital_status,
         photoUrl: member.photo_url,
         relationships: [],
@@ -120,6 +123,8 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
         familyId: member.family_id,
         occupation: member.occupation,
         gender: member.gender || 'unknown',
+        yearOfDeath: member.year_of_death,
+        name: member.full_name || member.name || '',
       }
     }
 
@@ -137,7 +142,7 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
       fullName: member.full_name,
       yearOfBirth: member.year_of_birth,
       livingPlace: member.living_place,
-      isDeceased: member.is_deceased,
+      isDeceased: Boolean(member.is_deceased),
       maritalStatus: member.marital_status,
       photoUrl: member.photo_url,
       relationships: memberRelationships,
@@ -146,6 +151,8 @@ export async function getFamilyMemberById(id: string): Promise<FamilyMember | nu
       familyId: member.family_id,
       occupation: member.occupation,
       gender: member.gender || 'unknown',
+      yearOfDeath: member.year_of_death,
+      name: member.full_name || member.name || '',
     }
   } catch (error) {
     console.error("Error in getFamilyMemberById:", error)
