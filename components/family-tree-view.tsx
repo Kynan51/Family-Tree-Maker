@@ -124,6 +124,16 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             if (yesValues.includes(v)) isDeceased = true;
             else if (noValues.includes(v)) isDeceased = false;
           }
+          // Robustly extract gender from all common column names
+          const genderRaw = rowObj.gender ?? rowObj.Gender ?? rowObj.sex ?? rowObj.Sex;
+          let gender = 'unknown';
+          if (typeof genderRaw === 'string') {
+            const g = genderRaw.trim().toLowerCase();
+            if (["male", "m"].includes(g)) gender = "male";
+            else if (["female", "f"].includes(g)) gender = "female";
+            else if (["other", "o"].includes(g)) gender = "other";
+            else gender = "unknown";
+          }
           // Check if member exists in DB (primary match)
           const supabase = createAdminClient();
           let { data: existing, error: findError } = await supabase
@@ -193,7 +203,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
             updatedAt: new Date().toISOString(),
             familyId: familyId,
             occupation: rowObj.occupation || '',
-            gender: rowObj.gender || 'unknown', // Add gender property
+            gender: gender as 'male' | 'female' | 'other' | 'unknown', // Fix type error
             generation: rowObj.generation || 0, // Add generation property (default 0)
           };
           if (existing?.id || (id && id !== member.id)) {

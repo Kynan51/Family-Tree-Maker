@@ -189,7 +189,16 @@ export default function CreateFamilyPage() {
         const livingPlace = objRaw["livingplace"] || objRaw["living_place"] || objRaw["place"] || objRaw["location"] || "Unknown"
         const maritalStatus = objRaw["maritalstatus"] || objRaw["marital_status"] || objRaw["status"] || "Single"
         const occupation = objRaw["occupation"] || ""
-        const gender = objRaw["gender"] || "unknown"
+        // Robustly map gender from all common column names
+        const genderRaw = getCol(objRaw, "gender", "Gender", "sex", "Sex");
+        let gender = "unknown";
+        if (typeof genderRaw === "string") {
+          const g = genderRaw.trim().toLowerCase();
+          if (["male", "m"].includes(g)) gender = "male";
+          else if (["female", "f"].includes(g)) gender = "female";
+          else if (["other", "o"].includes(g)) gender = "other";
+          else gender = "unknown";
+        }
         // Always map relationship fields as comma-separated strings (never arrays)
         // Use only lowercased, spaceless keys for relationship fields
         let parents = typeof objRaw["parents"] === 'string' ? objRaw["parents"].trim() : ''
@@ -239,7 +248,7 @@ export default function CreateFamilyPage() {
           isDeceased,
           maritalStatus: ["Single", "Married", "Divorced", "Widowed"].includes(maritalStatus) ? maritalStatus : undefined,
           occupation: occupation && String(occupation).trim() !== '' ? occupation : undefined,
-          gender: ["male", "female", "other", "unknown"].includes(gender) ? gender : undefined,
+          gender,
           parents,
           spouses,
           children,
