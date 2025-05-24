@@ -101,7 +101,7 @@ export default async function FamilyTreePage(props: { params: { familyId: string
   const safeMembers = members || []
   const transformedMembers = safeMembers.map((member) => ({
     ...member,
-    name: member.fullName,
+    name: member.fullName ?? "",
     children: [],
     relationships: member.relationships || [],
   }))
@@ -163,7 +163,7 @@ export default async function FamilyTreePage(props: { params: { familyId: string
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-px">
       <FamilyTreeClientPage
         family={family}
         familyMembers={transformedMembers}
