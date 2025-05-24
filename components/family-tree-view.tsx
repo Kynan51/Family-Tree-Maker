@@ -283,7 +283,6 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
   }
 
   const toggleMaximize = () => {
-    console.log('DEBUG: Maximize button clicked. Current isMaximized:', isMaximized);
     setIsMaximized(!isMaximized); // Fix: pass boolean, not function
   }
 
@@ -310,7 +309,6 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
       // Refresh the page to show the updated tree
       window.location.reload()
     } catch (error) {
-      console.error('Error detecting siblings:', error)
       toast({
         title: "Error",
         description: "Failed to detect siblings",
@@ -408,7 +406,6 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
           variant="outline" 
           size="icon" 
           onClick={() => {
-            console.log('DEBUG: Maximize button onClick');
             toggleMaximize();
           }}
           className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"

@@ -710,7 +710,6 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
         description: "Family member added successfully",
       })
     } catch (error) {
-      console.error('Error adding family member:', error)
       toast({
         title: "Error",
         description: "Failed to add family member",

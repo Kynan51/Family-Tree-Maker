@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
       console.warn(`[IMPORT] Duplicate member names detected:`, duplicateNames);
     }
     // Log the full incoming members array for debugging
-    console.log('[IMPORT] Incoming members payload:', JSON.stringify(members, null, 2));
     // Deduplicate members array before inserting
     // Improved deduplication: include sorted parent names in the key
     const uniqueMemberKey = (m: any) => {
@@ -87,7 +86,6 @@ export async function POST(req: NextRequest) {
     // Insert all members (prevent duplicates by checking DB first)
     for (const m of dedupedMembers) {
       // Debug: log the raw member object to see property names and values
-      console.log('[IMPORT DEBUG] Raw member object:', m);
       const normName = normalizeName(m.full_name);
       let id = nameToId[normName];
       let existingId = null;
@@ -198,7 +196,6 @@ export async function POST(req: NextRequest) {
             relationshipsToInsert.push({ member_id: memberId, related_member_id: parentId, type: 'parent' }); // child -> parent
             relationshipsToInsert.push({ member_id: parentId, related_member_id: memberId, type: 'child' }); // parent -> child
             totalRelationships += 2;
-            console.log(`[IMPORT] Creating parent/child relationship: ${m.full_name} (child) -> ${parentName} (parent)`);
           } else {
             skippedRelationships.push({ member: m.full_name, related: parentName, type: 'parent' });
             console.warn(`[IMPORT] Skipped parent relationship: ${m.full_name} -> ${parentName} (not found)`);
@@ -214,7 +211,6 @@ export async function POST(req: NextRequest) {
             relationshipsToInsert.push({ member_id: memberId, related_member_id: childId, type: 'child' }); // parent -> child
             relationshipsToInsert.push({ member_id: childId, related_member_id: memberId, type: 'parent' }); // child -> parent
             totalRelationships += 2;
-            console.log(`[IMPORT] Creating child/parent relationship: ${m.full_name} (parent) -> ${childName} (child)`);
           } else {
             skippedRelationships.push({ member: m.full_name, related: childName, type: 'child' });
             console.warn(`[IMPORT] Skipped child relationship: ${m.full_name} -> ${childName} (not found)`);
@@ -229,7 +225,6 @@ export async function POST(req: NextRequest) {
             relationshipsToInsert.push({ member_id: memberId, related_member_id: spouseId, type: 'spouse' });
             relationshipsToInsert.push({ member_id: spouseId, related_member_id: memberId, type: 'spouse' });
             totalRelationships += 2;
-            console.log(`[IMPORT] Creating spouse relationship: ${m.full_name} <-> ${spouseName}`);
           } else {
             skippedRelationships.push({ member: m.full_name, related: spouseName, type: 'spouse' });
             console.warn(`[IMPORT] Skipped spouse relationship: ${m.full_name} -> ${spouseName} (not found)`);
@@ -238,7 +233,6 @@ export async function POST(req: NextRequest) {
       }
     }
     // Log the relationshipsToInsert array
-    console.log('[IMPORT DEBUG] relationshipsToInsert:', JSON.stringify(relationshipsToInsert, null, 2));
     // Remove duplicate relationships
     const relSet = new Set();
     const uniqueRelationships = relationshipsToInsert.filter(rel => {
@@ -248,7 +242,6 @@ export async function POST(req: NextRequest) {
       return true;
     });
     if (uniqueRelationships.length > 0) {
-      console.log('[IMPORT] Attempting to upsert relationships:', JSON.stringify(uniqueRelationships, null, 2));
       const { error: relUpsertError, data: relUpsertData } = await supabase.from('relationships').upsert(uniqueRelationships, {
         onConflict: 'member_id,related_member_id,type',
         ignoreDuplicates: true

@@ -256,9 +256,6 @@ export default function CreateFamilyPage() {
           relationships,
         }
       })
-      // Log the transformed members for verification (expanded)
-      console.log('[IMPORT] Transformed Members:')
-      members.forEach(m => console.log(m))
       let importWarnings = []
       if (missingNameCount > 0) importWarnings.push(`${missingNameCount} member(s) had missing or empty names and were set to 'Unknown'.`)
       if (missingYearCount > 0) importWarnings.push(`${missingYearCount} member(s) had missing or invalid year of birth and were set to a default value.`)

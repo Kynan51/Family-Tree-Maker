@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { createAdminClient } from '../lib/supabase/admin';
 import { sampleFamilyMembers } from '../lib/sample-data';
+import type { Relationship } from '../lib/types';
 
 // Load environment variables
 config();
@@ -30,7 +31,7 @@ async function seed() {
 
       // Insert relationships
       if (relationships.length > 0) {
-        const relationshipsWithMemberId = relationships.map((rel) => ({
+        const relationshipsWithMemberId = relationships.map((rel: Relationship) => ({
           ...rel,
           memberId: memberData.id,
         }));
@@ -44,7 +45,7 @@ async function seed() {
         }
 
         // Create reciprocal relationships
-        const reciprocalRelationships = relationships.map((rel) => {
+        const reciprocalRelationships = relationships.map((rel: Relationship) => {
           let reciprocalType: 'parent' | 'child' | 'spouse' = 'spouse';
           if (rel.type === 'parent') {
             reciprocalType = 'child';
@@ -79,4 +80,4 @@ async function seed() {
 seed().catch((error) => {
   console.error('Error during seeding:', error);
   process.exit(1);
-}); 
+});

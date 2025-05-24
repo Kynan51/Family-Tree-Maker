@@ -49,7 +49,6 @@ export function EditFamilyMemberDialog({
   onUpdate,
   familyId,
 }: EditFamilyMemberDialogProps) {
-  console.log('DEBUG: EditFamilyMemberDialog rendered', { open, member, familyId });
 
   if (!familyId) {
     return (

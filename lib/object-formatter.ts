@@ -70,17 +70,6 @@ export function safeJsonStringify(obj: any, indent: number = 2): string {
 }
 
 /**
- * Safely logs an object to the console
- * 
- * @param label - Label for the log
- * @param obj - Object to log
- */
-export function safeConsoleLog(label: string, obj: any): void {
-  const sanitized = typeof obj === 'object' ? safeJsonStringify(obj) : obj;
-  console.log(`${label}:`, sanitized);
-}
-
-/**
  * Creates a display-safe version of an object for UI rendering
  * Converts nested objects to JSON strings to prevent [object Object] issues
  * 

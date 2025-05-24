@@ -27,7 +27,6 @@ export default function FamilyTreeClientPage({ family, familyMembers, isAdmin, f
 }) {
   const { isMaximized, setIsMaximized } = useMaximizedContext();
   useEffect(() => {
-    console.log('DEBUG: FamilyTreeClientPage render. isMaximized:', isMaximized);
   }, [isMaximized]);
   return (
     <>

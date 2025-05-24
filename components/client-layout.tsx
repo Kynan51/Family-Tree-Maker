@@ -21,10 +21,6 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    console.log("DEBUG: ClientLayout render. isMaximized:", isMaximized);
-  }, [isMaximized]);
-
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">

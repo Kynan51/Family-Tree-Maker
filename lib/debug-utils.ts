@@ -67,16 +67,6 @@ export function safeStringify(obj: any, maxDepth: number = 3): string {
 }
 
 /**
- * Log complex objects safely with depth control and circular reference handling
- * @param label - A descriptive label for the log
- * @param obj - The object to log
- * @param maxDepth - Maximum depth to log (default: 3)
- */
-export function debugLog(label: string, obj: any, maxDepth: number = 3): void {
-  console.log(`${label}: ${safeStringify(obj, maxDepth)}`);
-}
-
-/**
  * Analyze an object and create a structural report showing types and sample values
  * @param obj - The object to analyze
  * @returns A structural report of the object

@@ -11,24 +11,17 @@ const rl = readline.createInterface({
   output: process.stdout,
 })
 
-console.log("🌿 Environment Variables Downloader 🌿")
-console.log("This script will help you download environment variables for your Family Tree Maker app.")
-
 rl.question("Enter your Vercel project ID (or press Enter to skip): ", (projectId) => {
   if (!projectId) {
-    console.log("\nSkipping Vercel download. Creating .env file from template...")
     createEnvFromTemplate()
     return
   }
 
   rl.question("Enter your Vercel access token: ", (token) => {
     if (!token) {
-      console.log("\nAccess token is required for Vercel API. Creating .env file from template...")
       createEnvFromTemplate()
       return
     }
-
-    console.log("\nDownloading environment variables from Vercel...")
 
     const options = {
       hostname: "api.vercel.com",
@@ -58,7 +51,6 @@ rl.question("Enter your Vercel project ID (or press Enter to skip): ", (projectI
           const envVars = JSON.parse(data)
 
           if (!envVars.envs || envVars.envs.length === 0) {
-            console.log("No environment variables found.")
             createEnvFromTemplate()
             return
           }
@@ -71,7 +63,6 @@ rl.question("Enter your Vercel project ID (or press Enter to skip): ", (projectI
           })
 
           fs.writeFileSync(".env", envContent)
-          console.log("✅ Environment variables downloaded successfully!")
           rl.close()
         } catch (error) {
           console.error("Error parsing response:", error)
@@ -93,7 +84,6 @@ function createEnvFromTemplate() {
   try {
     if (fs.existsSync(".env.example")) {
       fs.copyFileSync(".env.example", ".env")
-      console.log("✅ Created .env file from template. Please update the values manually.")
     } else {
       const template = `# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
@@ -105,7 +95,6 @@ NEXTAUTH_SECRET=your-nextauth-secret
 NEXTAUTH_URL=http://localhost:3000
 `
       fs.writeFileSync(".env", template)
-      console.log("✅ Created default .env file. Please update the values manually.")
     }
   } catch (error) {
     console.error("Error creating .env file:", error)

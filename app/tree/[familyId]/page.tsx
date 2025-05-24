@@ -106,9 +106,6 @@ export default async function FamilyTreePage(props: { params: { familyId: string
     relationships: member.relationships || [],
   }))
 
-  // Debugging log
-  console.log('Transformed Members:', JSON.stringify(transformedMembers, null, 2));
-
   // If there are no members, show a root-member form (only for admins)
   if (safeMembers.length === 0) {
     // --- PATCH: skip root member form if just imported ---
@@ -163,7 +160,7 @@ export default async function FamilyTreePage(props: { params: { familyId: string
   }
 
   return (
-    <div className="container mx-auto py-px">
+    <div className="container mx-auto py-6">
       <FamilyTreeClientPage
         family={family}
         familyMembers={transformedMembers}

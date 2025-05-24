@@ -304,7 +304,6 @@ const generateFamilyTreeSVG = (): string | null => {
     if (!member.relationships) {
       return
     }
-    
     member.relationships.forEach((rel: Relationship) => {
       // Only use explicit relationship type for directionality
       if (rel.type === "parent") {
@@ -345,15 +344,32 @@ const generateFamilyTreeSVG = (): string | null => {
   })
 
   // Find root members
-  const rootMembers = Array.from(memberMap.values()).filter(member => {
-    // A member is a root if they have no parent relationships
-    const isRoot = !membersState.some(m => 
-      m.relationships?.some((rel: Relationship) => 
-        rel.type === "parent" && rel.relatedMemberId === member.id
+  // Debug: collect info for all members
+  const debugListsAParent: string[] = [];
+  const debugIsListedAsChild: string[] = [];
+  const debugFallbackRoots: string[] = [];
+
+  Array.from(memberMap.values()).forEach(member => {
+    const isListedAsChild = membersState.some(m =>
+      m.relationships?.some((rel: Relationship) =>
+        rel.type === 'parent' && rel.relatedMemberId === member.id
       )
-    )
-    return isRoot
-  })
+    );
+    const listsAParent = member.relationships?.some((rel: Relationship) =>
+      rel.type === 'parent'
+    );
+    if (isListedAsChild) debugIsListedAsChild.push(`${member.name} (${member.id})`);
+    if (listsAParent) debugListsAParent.push(`${member.name} (${member.id})`);
+    if (!listsAParent) debugFallbackRoots.push(`${member.name} (${member.id})`);
+  });
+
+  // Fallback: root is anyone who does not list a parent
+  const rootMembers = Array.from(memberMap.values()).filter(member => {
+    const listsAParent = member.relationships?.some((rel: Relationship) =>
+      rel.type === 'parent'
+    );
+    return !listsAParent;
+  });
 
   if (rootMembers.length === 0) {
     return ''
@@ -370,7 +386,7 @@ const generateFamilyTreeSVG = (): string | null => {
   // Calculate dimensions for all root members
   let totalWidth = 0
   let maxHeight = 0
-  rootMembers.forEach(root => {
+  rootMembers.forEach((root, idx) => {
     const dims = calculateSubtreeDimensions(root)
     totalWidth += dims.width
     maxHeight = Math.max(maxHeight, dims.height)
@@ -406,7 +422,7 @@ const generateFamilyTreeSVG = (): string | null => {
 
   // Layout each root member
   let currentX = startX;
-  rootMembers.forEach((root) => {
+  rootMembers.forEach((root, idx) => {
     const x = currentX + (root.subtreeWidth || 0) / 2 - (CARD_WIDTH / 2);
     layoutTree(svgElement, root, x, PADDING);
     currentX += (root.subtreeWidth || 0) + rootSpacing;
@@ -509,50 +525,57 @@ export function ExportButton({ familyId }: ExportButtonProps) {
         const img = new Image()
         const svg = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
         const url = URL.createObjectURL(svg)
-        
         img.onload = () => {
           try {
-            // Create a canvas with higher resolution
-            const scale = 2; // Increase resolution by 2x
+            // Clamp max canvas size
+            const scale = 2; // Initial scale
+            const MAX_CANVAS_WIDTH = 10000;
+            const MAX_CANVAS_HEIGHT = 5000;
+            let canvasWidth = img.width * scale;
+            let canvasHeight = img.height * scale;
+            let drawScale = scale;
+            if (canvasWidth > MAX_CANVAS_WIDTH || canvasHeight > MAX_CANVAS_HEIGHT) {
+              const widthRatio = MAX_CANVAS_WIDTH / canvasWidth;
+              const heightRatio = MAX_CANVAS_HEIGHT / canvasHeight;
+              const minRatio = Math.min(widthRatio, heightRatio);
+              canvasWidth = Math.floor(canvasWidth * minRatio);
+              canvasHeight = Math.floor(canvasHeight * minRatio);
+              drawScale = canvasWidth / img.width;
+              console.warn('[PNG Export] Canvas size clamped', {canvasWidth, canvasHeight, drawScale});
+            }
             const canvas = document.createElement('canvas')
-            canvas.width = img.width * scale
-            canvas.height = img.height * scale
+            canvas.width = canvasWidth
+            canvas.height = canvasHeight
             const ctx = canvas.getContext('2d')
             if (!ctx) {
               throw new Error('Could not get canvas context')
             }
-            
             // Set white background
             ctx.fillStyle = 'white'
             ctx.fillRect(0, 0, canvas.width, canvas.height)
-            
             // Enable image smoothing
             ctx.imageSmoothingEnabled = true
             ctx.imageSmoothingQuality = 'high'
-            
             // Scale the context to match the canvas size
-            ctx.scale(scale, scale)
-            
+            ctx.setTransform(drawScale, 0, 0, drawScale, 0, 0);
             // Draw the image
             ctx.drawImage(img, 0, 0)
-            
             // Convert to PNG with high quality
             const pngUrl = canvas.toDataURL('image/png', 1.0)
-            const link = document.createElement("a")
-            link.href = pngUrl
-            link.download = `family-tree-${currentFamilyId}.png`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            
+            const pngLink = document.createElement("a")
+            pngLink.href = pngUrl
+            pngLink.download = `family-tree-${currentFamilyId}.png`
+            document.body.appendChild(pngLink)
+            pngLink.click()
+            document.body.removeChild(pngLink)
             URL.revokeObjectURL(url)
             canvas.remove()
-            
             toast({
               title: "Export Successful",
               description: "Your family tree has been exported as PNG",
             })
           } catch (error) {
+            console.error('[PNG Export] Error during PNG conversion', error)
             toast({
               title: "Export Failed",
               description: "Failed to convert SVG to PNG",
@@ -562,8 +585,8 @@ export function ExportButton({ familyId }: ExportButtonProps) {
             setIsExporting(false)
           }
         }
-        
         img.onerror = (error) => {
+          console.error('[PNG Export] Failed to load SVG for PNG conversion', error, url, svgString.slice(0, 500))
           toast({
             title: "Export Failed",
             description: "Failed to load SVG for PNG conversion",
@@ -572,7 +595,6 @@ export function ExportButton({ familyId }: ExportButtonProps) {
           setIsExporting(false)
           URL.revokeObjectURL(url)
         }
-        
         // Set crossOrigin to anonymous to avoid CORS issues
         img.crossOrigin = "anonymous"
         img.src = url

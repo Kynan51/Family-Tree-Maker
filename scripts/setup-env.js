@@ -11,14 +11,10 @@ const rl = readline.createInterface({
   output: process.stdout,
 })
 
-console.log("🌿 Family Tree Maker Environment Setup 🌿")
-console.log("This script will help you set up the required environment variables.")
-
 // Check if .env file already exists
 if (fs.existsSync(".env")) {
   rl.question("An .env file already exists. Do you want to overwrite it? (y/n): ", (answer) => {
     if (answer.toLowerCase() !== "y") {
-      console.log("Setup cancelled. Your .env file was not modified.")
       rl.close()
       return
     }
@@ -29,8 +25,6 @@ if (fs.existsSync(".env")) {
 }
 
 function setupEnv() {
-  console.log("\nPlease provide the following information:")
-
   rl.question("Supabase URL: ", (supabaseUrl) => {
     rl.question("Supabase Anon Key: ", (supabaseAnonKey) => {
       rl.question("Supabase Service Role Key: ", (supabaseServiceKey) => {
@@ -49,8 +43,6 @@ NEXTAUTH_URL=${nextAuthUrl || "http://localhost:3000"}
 `
 
           fs.writeFileSync(".env", envContent)
-          console.log("\n✅ Environment variables have been set up successfully!")
-          console.log("You can now start your application.")
           rl.close()
         })
       })
