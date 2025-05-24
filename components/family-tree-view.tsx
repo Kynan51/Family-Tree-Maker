@@ -321,32 +321,32 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
 
   return (
     <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[30] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
-      {/* Control bar at the top, no extra header */}
-      <div className={`flex flex-col sm:flex-row justify-between gap-2 items-center ${isMaximized ? 'p-2' : 'mb-4'} z-40 pointer-events-auto w-full`}>
-        <Tabs value={view} onValueChange={(v) => handleViewChange(v as "tree" | "timeline")} className="w-full sm:w-auto">
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
-              <GitBranch className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Tree View</span>
-              <span className="sm:hidden">Tree</span>
-            </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex-1 sm:flex-none" disabled={isViewLoading}>
-              <Timeline className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Timeline View</span>
-              <span className="sm:hidden">Timeline</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="flex flex-wrap items-center gap-2 justify-end">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomOut className="h-4 w-4" />}
-            </Button>
-            <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
-            <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
-            </Button>
-          </div>
+      {/* Unified control bar container - horizontal row with wrapping */}
+      <div className="w-full sm:w-auto mb-4 z-40 pointer-events-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full">
+          {/* Tab switcher always at the start */}
+          <Tabs value={view} onValueChange={(v) => handleViewChange(v as 'tree' | 'timeline')} className="w-auto">
+            <TabsList className="w-auto">
+              <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
+                <GitBranch className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Tree View</span>
+                <span className="sm:hidden">Tree</span>
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="flex-1 sm:flex-none" disabled={isViewLoading}>
+                <Timeline className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Timeline View</span>
+                <span className="sm:hidden">Timeline</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {/* All action buttons and zoom controls follow, wrapping as needed */}
+          <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomOut className="h-4 w-4" />}
+          </Button>
+          <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
+          <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
+          </Button>
           <ExportButton familyId={familyId} />
           <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={isPublic ?? false} />
           {isAdmin && (
@@ -378,10 +378,7 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
                   style={{ display: 'none' }}
                   onChange={handleImportExcel}
                 />
-                <Button
-                  asChild
-                  variant="info"
-                >
+                <Button asChild variant="info">
                   <div>
                     <span className="hidden sm:inline">Import from Excel</span>
                     <span className="sm:hidden">Import</span>

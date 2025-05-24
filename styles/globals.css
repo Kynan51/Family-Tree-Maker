@@ -113,3 +113,24 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@media (min-width: 640px) {
+  body {
+    margin-left: 0px;
+    margin-right: 0px;
+    padding-left: 0px;
+    padding-right: 0px;
+  }
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  /* Action bar layout for screens >= 640px */
+  .action-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+}
