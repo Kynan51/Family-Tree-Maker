@@ -70,6 +70,8 @@ interface FamilyTreeD3Props {
   data: FamilyMember[]
   isAdmin: boolean
   familyId: string
+  containerRef?: React.RefObject<HTMLDivElement>
+  isFullscreen?: boolean
 }
 
 function useIsDarkMode() {
@@ -173,7 +175,7 @@ function buildNestedFamilyTree(flatMembers: FamilyMember[]): FamilyMember[] {
   return roots
 }
 
-function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
+function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin, containerRef, isFullscreen }: any) {
   const isDark = useIsDarkMode()
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
@@ -377,7 +379,7 @@ function CustomNode({ nodeDatum, toggleNode, onAdd, isAdmin }: any) {
             <div className="text-muted-foreground text-xs">Died: {tooltipData.yearOfDeath}</div>
           )}
         </div>,
-        document.body
+        (isFullscreen && containerRef && containerRef.current) ? containerRef.current : document.body
       )}
     </g>
   )
@@ -481,7 +483,7 @@ interface FormState {
   isDeceased: string
 }
 
-export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
+export function FamilyTreeD3({ data, isAdmin, familyId, containerRef, isFullscreen }: FamilyTreeD3Props) {
   const svgRef = useRef<HTMLDivElement>(null)
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -881,6 +883,8 @@ export function FamilyTreeD3({ data, isAdmin, familyId }: FamilyTreeD3Props) {
               {...rd3tProps}
               onAdd={handleAddMemberClick}
               isAdmin={isAdmin}
+              containerRef={containerRef}
+              isFullscreen={isFullscreen}
             />
           )}
         />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimerIcon as Timeline, GitBranch, Plus, ZoomIn, ZoomOut, Maximize2, Minimize2, Users, Loader2 } from "lucide-react"
@@ -14,6 +14,8 @@ import * as XLSX from "xlsx"
 import { createFamilyMember, updateFamilyMember } from "@/lib/actions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { toast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
+import * as React from "react"
 
 interface FamilyTreeViewProps {
   familyMembers: FamilyMember[]
@@ -32,10 +34,12 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isViewLoading, setIsViewLoading] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
   const [isDetectingSiblings, setIsDetectingSiblings] = useState(false)
+  const [isTooltipHovered, setIsTooltipHovered] = useState(false)
   // Default required columns match export logic
   const defaultColumns = [
     "full_name",
@@ -282,9 +286,73 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
     reader.readAsBinaryString(file)
   }
 
-  const toggleMaximize = () => {
-    setIsMaximized(!isMaximized); // Fix: pass boolean, not function
+  // Cross-browser requestFullscreen
+  const requestFullscreen = (el: HTMLElement) => {
+    if (el.requestFullscreen) return el.requestFullscreen()
+    // @ts-ignore
+    if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen()
+    // @ts-ignore
+    if (el.mozRequestFullScreen) return el.mozRequestFullScreen()
+    // @ts-ignore
+    if (el.msRequestFullscreen) return el.msRequestFullscreen()
   }
+
+  // Cross-browser exitFullscreen
+  const exitFullscreen = () => {
+    if (document.exitFullscreen) return document.exitFullscreen()
+    // @ts-ignore
+    if (document.webkitExitFullscreen) return document.webkitExitFullscreen()
+    // @ts-ignore
+    if (document.mozCancelFullScreen) return document.mozCancelFullScreen()
+    // @ts-ignore
+    if (document.msExitFullscreen) return document.msExitFullscreen()
+  }
+
+  // Listen for fullscreen changes (all vendor prefixes)
+  useEffect(() => {
+    const handler = () => {
+      const isFs =
+        !!document.fullscreenElement ||
+        // @ts-ignore
+        !!document.webkitFullscreenElement ||
+        // @ts-ignore
+        !!document.mozFullScreenElement ||
+        // @ts-ignore
+        !!document.msFullscreenElement
+      setIsFullscreen(isFs)
+      if (setIsMaximizedProp) setIsMaximizedProp(isFs)
+    }
+    document.addEventListener("fullscreenchange", handler)
+    document.addEventListener("webkitfullscreenchange", handler)
+    document.addEventListener("mozfullscreenchange", handler)
+    document.addEventListener("MSFullscreenChange", handler)
+    return () => {
+      document.removeEventListener("fullscreenchange", handler)
+      document.removeEventListener("webkitfullscreenchange", handler)
+      document.removeEventListener("mozfullscreenchange", handler)
+      document.removeEventListener("MSFullscreenChange", handler)
+    }
+  }, [setIsMaximizedProp])
+
+  // Toggle fullscreen on the container
+  const toggleMaximize = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const isFs =
+      !!document.fullscreenElement ||
+      // @ts-ignore
+      !!document.webkitFullscreenElement ||
+      // @ts-ignore
+      !!document.mozFullScreenElement ||
+      // @ts-ignore
+      !!document.msFullscreenElement
+    if (!isFs) {
+      requestFullscreen(el)
+    } else {
+      exitFullscreen()
+    }
+    // Styling state will be synced by the fullscreenchange event
+  }, [])
 
   const handleDetectSiblings = async () => {
     try {
@@ -320,114 +388,175 @@ export function FamilyTreeView({ familyMembers, isAdmin, familyId, isMaximizedPr
   }
 
   return (
-    <div className={`flex flex-col ${isMaximized ? 'fixed inset-0 z-[30] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
-      {/* Unified control bar container - horizontal row with wrapping */}
-      <div className="w-full sm:w-auto mb-4 z-40 pointer-events-auto">
-        <div className="flex flex-wrap items-center gap-2 w-full">
-          {/* Tab switcher always at the start */}
-          <Tabs value={view} onValueChange={(v) => handleViewChange(v as 'tree' | 'timeline')} className="w-auto">
-            <TabsList className="w-auto">
-              <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
-                <GitBranch className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Tree View</span>
-                <span className="sm:hidden">Tree</span>
-              </TabsTrigger>
-              <TabsTrigger value="timeline" className="flex-1 sm:flex-none" disabled={isViewLoading}>
-                <Timeline className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Timeline View</span>
-                <span className="sm:hidden">Timeline</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {/* All action buttons and zoom controls follow, wrapping as needed */}
-          <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomOut className="h-4 w-4" />}
-          </Button>
-          <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
-          <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
-          </Button>
-          <ExportButton familyId={familyId} />
-          <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={isPublic ?? false} />
-          {isAdmin && (
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">
-                <Plus className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Add Member</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-              <Button 
-                onClick={handleDetectSiblings} 
-                disabled={isDetectingSiblings}
-                variant="info"
-                className="whitespace-nowrap"
-              >
-                {isDetectingSiblings ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Users className="h-4 w-4 mr-2" />
-                )}
-                <span className="hidden sm:inline">Detect Siblings</span>
-                <span className="sm:hidden">Detect</span>
-              </Button>
-              <label htmlFor="import-excel" className="whitespace-nowrap">
-                <input
-                  id="import-excel"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  style={{ display: 'none' }}
-                  onChange={handleImportExcel}
-                />
-                <Button asChild variant="info">
-                  <div>
-                    <span className="hidden sm:inline">Import from Excel</span>
-                    <span className="sm:hidden">Import</span>
-                  </div>
+    <TooltipProvider>
+      <div className={`flex flex-col ${isFullscreen ? 'fixed inset-0 z-[30] bg-background' : 'h-[calc(100vh-10rem)]'}`}>
+        {/* Unified control bar container - horizontal row with wrapping */}
+        <div className="w-full sm:w-auto mb-4 z-40 pointer-events-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full">
+            {/* Tab switcher always at the start */}
+            <Tabs value={view} onValueChange={(v) => handleViewChange(v as 'tree' | 'timeline')} className="w-auto">
+              <TabsList className="w-auto">
+                <TabsTrigger value="tree" className="flex-1 sm:flex-none" disabled={isViewLoading}>
+                  <GitBranch className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Tree View</span>
+                  <span className="sm:hidden">Tree</span>
+                </TabsTrigger>
+                <TabsTrigger value="timeline" className="flex-1 sm:flex-none" disabled={isViewLoading}>
+                  <Timeline className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Timeline View</span>
+                  <span className="sm:hidden">Timeline</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {/* All action buttons and zoom controls follow, wrapping as needed */}
+            <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomOut className="h-4 w-4" />}
+            </Button>
+            <span className="text-sm w-12 text-center">{Math.round(zoom * 100)}%</span>
+            <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ZoomIn className="h-4 w-4" />}
+            </Button>
+            <ExportButton familyId={familyId} />
+            <ShareButton familyId={familyId} familyName={"Family Tree"} isPublic={isPublic ?? false} />
+            {isAdmin && (
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setShowAddDialog(true)} variant="success" className="whitespace-nowrap">
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Add Member</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
-              </label>
+                <Button 
+                  onClick={handleDetectSiblings} 
+                  disabled={isDetectingSiblings}
+                  variant="info"
+                  className="whitespace-nowrap"
+                >
+                  {isDetectingSiblings ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Users className="h-4 w-4 mr-2" />
+                  )}
+                  <span className="hidden sm:inline">Detect Siblings</span>
+                  <span className="sm:hidden">Detect</span>
+                </Button>
+                <label htmlFor="import-excel" className="whitespace-nowrap">
+                  <input
+                    id="import-excel"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    style={{ display: 'none' }}
+                    onChange={handleImportExcel}
+                  />
+                  <Button asChild variant="info">
+                    <div>
+                      <span className="hidden sm:inline">Import from Excel</span>
+                      <span className="sm:hidden">Import</span>
+                    </div>
+                  </Button>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+        <div 
+          ref={containerRef} 
+          className={`flex-1 ${isFullscreen ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative z-20 ${isFullscreen ? 'pointer-events-auto' : ''}`}
+          style={{ pointerEvents: isFullscreen ? 'auto' : undefined }}
+        >
+          {isViewLoading && (
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
-        </div>
-      </div>
-      <div 
-        ref={containerRef} 
-        className={`flex-1 ${isMaximized ? 'border-0' : 'border rounded-lg'} overflow-hidden tree-canvas relative z-20 ${isMaximized ? 'pointer-events-auto' : ''}`}
-        style={{ pointerEvents: isMaximized ? 'auto' : undefined }}
-      >
-        {isViewLoading && (
-          <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-        <Button 
-          variant="outline" 
-          size="icon" 
-          onClick={() => {
-            toggleMaximize();
-          }}
-          className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"
-        >
-          {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </Button>
-        <div
-          style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: "0 0",
-            width: `${100 / zoom}%`,
-            height: `${100 / zoom}%`,
-          }}
-        >
-          {view === "tree" ? (
-            familyMembers && familyMembers.length > 0 ? (
-              <FamilyTreeD3 data={familyMembers.map(m => ({ ...m, generation: (m as any).generation ?? 0 }))} isAdmin={isAdmin} familyId={familyId} />
-            ) : (
-              <div className="flex items-center justify-center h-full w-full text-lg text-muted-foreground">No family tree available</div>
-            )
+          {/* Maximize/Minimize Button with Tooltip */}
+          {isFullscreen ? (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  console.log('[DEBUG] Maximize button clicked. isFullscreen before:', isFullscreen);
+                  toggleMaximize();
+                  setTimeout(() => {
+                    console.log('[DEBUG] isFullscreen after:', document.fullscreenElement != null);
+                  }, 100);
+                }}
+                onMouseEnter={() => {
+                  setIsTooltipHovered(true);
+                  console.log('[DEBUG] Mouse entered maximize/minimize button. isFullscreen:', isFullscreen);
+                }}
+                onMouseLeave={() => {
+                  setIsTooltipHovered(false);
+                  console.log('[DEBUG] Mouse left maximize/minimize button. isFullscreen:', isFullscreen);
+                }}
+                className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"
+              >
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+              {isTooltipHovered && (
+                <div
+                  className="absolute top-12 right-2 z-50 bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md rounded-md border select-none"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  Exit Fullscreen
+                </div>
+              )}
+            </>
           ) : (
-            <TimelineChart familyMembers={familyMembers} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    console.log('[DEBUG] Maximize button clicked. isFullscreen before:', isFullscreen);
+                    toggleMaximize();
+                    setTimeout(() => {
+                      console.log('[DEBUG] isFullscreen after:', document.fullscreenElement != null);
+                    }, 100);
+                  }}
+                  onMouseEnter={() => {
+                    console.log('[DEBUG] Mouse entered maximize/minimize button. isFullscreen:', isFullscreen);
+                  }}
+                  onMouseLeave={() => {
+                    console.log('[DEBUG] Mouse left maximize/minimize button. isFullscreen:', isFullscreen);
+                  }}
+                  className="absolute top-2 right-2 z-30 bg-background/80 hover:bg-yellow-500 hover:text-white transition-colors"
+                >
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="select-none">
+                {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              </TooltipContent>
+            </Tooltip>
           )}
+          <div
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
+            }}
+          >
+            {view === "tree" ? (
+              familyMembers && familyMembers.length > 0 ? (
+                <FamilyTreeD3 
+                  data={familyMembers.map(m => ({ ...m, generation: (m as any).generation ?? 0 }))} 
+                  isAdmin={isAdmin} 
+                  familyId={familyId} 
+                  containerRef={containerRef}
+                  isFullscreen={isFullscreen}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full w-full text-lg text-muted-foreground">No family tree available</div>
+              )
+            ) : (
+              <TimelineChart familyMembers={familyMembers} />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
