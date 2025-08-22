@@ -1,0 +1,49 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs every Monday at 9:00 AM UTC.
+    - cron: '0 9 * * 1'
+
+jobs:
+  ping_supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Supabase client
+        run: npm install @supabase/supabase-js
+
+      - name: Run a simple script to ping Supabase
+        run: |
+          node -e "
+            const { createClient } = require('@supabase/supabase-js');
+            const supabaseUrl = process.env.SUPABASE_URL;
+            const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+            const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+            async function pingSupabase() {
+              try {
+                // Perform a simple, non-destructive query
+                const { data, error } = await supabase.from('families').select('id').limit(1);
+
+                if (error) throw error;
+                
+                console.log('Successfully pinged Supabase project.');
+              } catch (err) {
+                console.error('Error pinging Supabase:', err.message);
+                process.exit(1);
+              }
+            }
+            
+            pingSupabase();
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
